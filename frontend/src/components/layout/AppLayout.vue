@@ -1,9 +1,6 @@
 <!-- 인수인계용: 공통 레이아웃(사이드바/본문 레이아웃) -->
 <template>
   <div class="app">
-    <!-- 모바일 오버레이 -->
-    <div class="overlay" v-if="sidebarOpen" @click="closeSidebar" />
-
     <!-- 사이드바 컴포넌트 -->
     <Sidebar :isOpen="sidebarOpen" @close="closeSidebar" />
 
@@ -59,15 +56,15 @@ function closeSidebar() {
 .app {
   min-height: 100vh;
   display: grid;
-  grid-template-columns: 260px minmax(0, 1fr);
-  font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, "Noto Sans KR", Arial;
+  grid-template-columns: 244px minmax(0, 1fr);
+  font-family: "IBM Plex Sans KR", system-ui, sans-serif;
   color: var(--ink);
   background: var(--bg);
 }
 
 .main {
   display: grid;
-  grid-template-rows: 76px 1fr;
+  grid-template-rows: auto minmax(0, 1fr);
   min-height: 100vh;
   min-width: 0;
 }
@@ -75,22 +72,8 @@ function closeSidebar() {
 /* Mobile responsive */
 @media (max-width: 820px) {
   .app {
-    grid-template-columns: 1fr;
-  }
-  
-  .overlay {
-    display: block;
-    position: fixed;
-    inset: 0;
-    background: rgba(0, 0, 0, 0.4);
-    z-index: 900;
+    grid-template-columns: 66px minmax(0, 1fr);
   }
 }
 
-/* Global variable support if needed */
-:global(:root) {
-  --b1: #1d4ed8;
-  --b2: #0ea5e9;
-  --ring: rgba(29, 78, 216, 0.18);
-}
 </style>

@@ -1,39 +1,54 @@
-<!-- 인수인계용: 사이드바 내비게이션 및 로그아웃 UI -->
 <template>
   <aside class="sidebar" :class="{ open: isOpen }">
-    <div class="sb-brand">
-      <div class="sb-logo"><img src="/logo.png" alt="DoQ" /></div>
-    </div>
+    <button class="brand" type="button" aria-label="홈으로 이동" @click="navigate('home')">
+      <span class="brand-mark"><Search :size="19" :stroke-width="2.5" /></span>
+      <span class="brand-name">DOQ</span>
+    </button>
 
-    <nav class="sb-nav">
+    <div class="nav-label">메뉴</div>
+    <nav class="sb-nav" aria-label="주요 메뉴">
       <button class="sb-item" :class="{ active: currentRouteName === 'home' }" @click="navigate('home')">
-        <span class="ico">🏠</span><span class="txt">홈</span>
-      </button>
-      <button class="sb-item" :class="{ active: currentRouteName === 'drive' }" @click="navigate('drive')">
-        <span class="ico">🗂️</span><span class="txt">드라이브</span>
+        <House :size="19" /><span>홈</span>
       </button>
       <button class="sb-item" :class="{ active: currentRouteName === 'upload' }" @click="navigate('upload')">
-        <span class="ico">📤</span><span class="txt">업로드</span>
+        <Upload :size="19" /><span>업로드</span>
+      </button>
+      <button class="sb-item" :class="{ active: currentRouteName === 'drive' }" @click="navigate('drive')">
+        <FolderOpen :size="19" /><span>드라이브</span>
+      </button>
+      <button class="sb-item" :class="{ active: currentRouteName === 'documentView' }" @click="navigateDocument">
+        <FileText :size="19" /><span>문서 보기</span>
       </button>
       <button class="sb-item" :class="{ active: currentRouteName === 'qa' }" @click="navigate('qa')">
-        <span class="ico">💬</span><span class="txt">Q&A</span>
+        <MessageSquareText :size="19" /><span>Q&amp;A</span>
       </button>
       <button class="sb-item" :class="{ active: currentRouteName === 'terms' }" @click="navigate('terms')">
-        <span class="ico">📚</span><span class="txt">용어집</span>
-      </button>
-
-      <div class="sb-sep"></div>
-
-      <button class="sb-item" :class="{ active: currentRouteName === 'profile' }" @click="navigate('profile')">
-        <span class="ico">👤</span><span class="txt">프로필</span>
-      </button>
-      <button v-if="isAdmin" class="sb-item" :class="{ active: currentRouteName === 'admin' }" @click="navigate('admin')">
-        <span class="ico">🛡️</span><span class="txt">관리자</span>
+        <BookOpen :size="19" /><span>용어집</span>
       </button>
     </nav>
 
-    <div class="sb-bottom">
-      <button class="sb-logout" @click="handleLogout">log out</button>
+    <div class="sb-sep" />
+
+    <nav class="sb-nav" aria-label="계정 메뉴">
+      <button class="sb-item" :class="{ active: currentRouteName === 'profile' }" @click="navigate('profile')">
+        <UserRound :size="19" /><span>프로필</span>
+      </button>
+      <button v-if="isAdmin" class="sb-item" :class="{ active: currentRouteName === 'admin' }" @click="navigate('admin')">
+        <ShieldCheck :size="19" /><span>관리자</span>
+      </button>
+    </nav>
+
+    <div class="account-card">
+      <div class="account-row">
+        <span class="avatar">{{ initial }}</span>
+        <span class="account-copy">
+          <strong>{{ userName }}</strong>
+          <small>{{ userEmail }}</small>
+        </span>
+      </div>
+      <button class="logout" type="button" @click="handleLogout">
+        <LogOut :size="16" /><span>로그아웃</span>
+      </button>
     </div>
   </aside>
 </template>
@@ -41,6 +56,18 @@
 <script setup lang="ts">
 import { computed } from "vue";
 import { useRouter, useRoute } from "vue-router";
+import {
+  BookOpen,
+  FolderOpen,
+  FileText,
+  House,
+  LogOut,
+  MessageSquareText,
+  Search,
+  ShieldCheck,
+  Upload,
+  UserRound,
+} from "@lucide/vue";
 import { useAuthStore } from "../../stores/auth";
 
 defineProps<{ isOpen: boolean }>();
@@ -51,13 +78,23 @@ const route = useRoute();
 const authStore = useAuthStore();
 const currentRouteName = computed(() => route.name);
 const isAdmin = computed(() => authStore.user?.role === "ADMIN");
+const userName = computed(() => authStore.user?.name || "사용자");
+const userEmail = computed(() => authStore.user?.email || "로그인 계정");
+const initial = computed(() => userName.value.trim().charAt(0).toUpperCase() || "U");
 
 function navigate(name: string) {
   emit("close");
   router.push({ name }).catch(() => {});
 }
 
-async function handleLogout() {
+function navigateDocument() {
+  emit("close");
+  const currentId = String(route.params.id || localStorage.getItem("last_document_id") || "");
+  if (currentId) router.push({ name: "documentView", params: { id: currentId } }).catch(() => {});
+  else router.push({ name: "drive" }).catch(() => {});
+}
+
+function handleLogout() {
   emit("close");
   authStore.logout();
   router.push({ name: "login" });
@@ -66,48 +103,140 @@ async function handleLogout() {
 
 <style scoped>
 .sidebar {
-  background: var(--sidebar-bg);
-  border-right: 1px solid var(--line);
-  backdrop-filter: blur(10px);
-  padding: 16px 12px;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  width: 260px;
   position: sticky;
   top: 0;
+  width: 244px;
   height: 100vh;
+  padding: 20px 16px;
+  display: flex;
+  flex-direction: column;
   overflow-y: auto;
+  color: var(--sidebar-fg);
+  background: var(--sidebar-bg);
+  border-right: 1px solid var(--line);
 }
-.sb-brand { display: flex; align-items: center; padding: 6px 10px 12px; }
-.sb-logo { width: 72px; height: 72px; border-radius: 18px; display: grid; place-items: center; overflow: hidden; }
-.sb-logo img { width: 100%; height: 100%; object-fit: contain; }
-.sb-nav { display: grid; gap: 4px; padding: 0 4px; }
+
+.brand {
+  width: fit-content;
+  margin: 0 8px 24px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 11px;
+  border: 0;
+  color: var(--ink);
+  background: transparent;
+  cursor: pointer;
+}
+
+.brand-mark {
+  width: 36px;
+  height: 36px;
+  display: grid;
+  place-items: center;
+  border-radius: 12px;
+  color: #fff;
+  background: var(--accent-gradient);
+  box-shadow: 0 7px 18px rgb(106 77 255 / 0.28);
+}
+
+.brand-name {
+  font-family: "Space Grotesk", "IBM Plex Sans KR", sans-serif;
+  font-size: 21px;
+  font-weight: 700;
+}
+
+.nav-label {
+  padding: 0 10px 8px;
+  color: var(--sidebar-muted);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.sb-nav { display: grid; gap: 3px; }
+
 .sb-item {
-  width: 100%; display: flex; align-items: center; gap: 10px; padding: 10px 12px;
-  border-radius: 10px; border: 1px solid transparent; background: transparent;
-  cursor: pointer; color: var(--muted); font-weight: 950; text-align: left;
+  width: 100%;
+  min-height: 42px;
+  padding: 10px 12px;
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  border: 1px solid transparent;
+  border-radius: 12px;
+  color: var(--sidebar-fg);
+  background: transparent;
+  font-size: 13.5px;
+  font-weight: 500;
+  text-align: left;
+  cursor: pointer;
+  transition: color .18s ease, background .18s ease, border-color .18s ease;
 }
-.ico { width: 18px; display: grid; place-items: center; }
-.txt { font-size: 13px; }
-.sb-sep { height: 1px; background: var(--line); margin: 6px 0; }
-.sb-bottom { margin-top: auto; display: flex; gap: 8px; padding: 8px 6px 0; }
-.sb-logout {
-  width: 100%; border-radius: 10px; border: 1px solid var(--accent);
-  background: linear-gradient(135deg, var(--accent), var(--accent-2)); color: #fff;
-  cursor: pointer; font-weight: 900; padding: 10px 12px; text-align: center;
+
+.sb-item:hover { color: var(--ink); background: var(--soft); }
+.sb-item.active {
+  color: var(--accent-strong);
+  font-weight: 600;
+  background: var(--accent-soft);
+  border-color: var(--accent-border);
 }
-.sb-logo { background: #ffffff; border: 1px solid rgb(15 23 42 / 0.08); box-shadow: 0 10px 26px rgb(15 23 42 / 0.08); }
-.sb-item:hover { color: var(--ink); background: var(--button-hover); border-color: var(--field-border); }
-.sb-item.active { color: var(--ink); background: var(--accent-soft); border-color: var(--accent-border); }
-:global([data-theme="dark"]) .sidebar { box-shadow: inset -1px 0 0 rgb(255 255 255 / 0.03); }
-:global([data-theme="dark"]) .sb-logo { background: #f8fafc; border-color: rgb(255 255 255 / 0.12); box-shadow: 0 16px 34px rgb(0 0 0 / 0.24); }
+
+.sb-sep { height: 1px; margin: 14px 6px; background: var(--line); }
+
+.account-card {
+  margin-top: auto;
+  padding: 13px;
+  border: 1px solid var(--line);
+  border-radius: 15px;
+  background: var(--soft);
+}
+
+.account-row { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.avatar {
+  width: 36px;
+  height: 36px;
+  display: grid;
+  place-items: center;
+  flex: none;
+  border-radius: 11px;
+  color: #fff;
+  background: linear-gradient(135deg, #ffb86b, #ff7eb3);
+  font-size: 14px;
+  font-weight: 700;
+}
+.account-copy { min-width: 0; display: grid; }
+.account-copy strong, .account-copy small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.account-copy strong { color: var(--ink); font-size: 13px; font-weight: 600; }
+.account-copy small { margin-top: 2px; color: var(--muted); font-size: 11px; }
+.logout {
+  width: 100%;
+  min-height: 36px;
+  margin-top: 12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  border: 1px solid var(--field-border);
+  border-radius: 10px;
+  color: var(--muted);
+  background: var(--card);
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.logout:hover { color: var(--ink); border-color: var(--accent-border); }
 
 @media (max-width: 820px) {
   .sidebar {
-    position: fixed; top: 0; left: 0; height: 100vh; width: 260px;
-    transform: translateX(-100%); transition: transform 0.25s ease; z-index: 1000;
+    position: sticky;
+    width: 66px;
+    padding-left: 10px;
+    padding-right: 10px;
+    transform: none;
+    box-shadow: none;
   }
-  .sidebar.open { transform: translateX(0); }
+  .brand { width: 100%; margin-left: 0; margin-right: 0; justify-content: center; }
+  .brand-name, .nav-label, .sb-item span, .account-card { display: none; }
+  .sb-item { justify-content: center; padding-left: 0; padding-right: 0; gap: 0; }
 }
 </style>

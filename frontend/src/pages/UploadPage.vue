@@ -1,158 +1,75 @@
 <template>
-  <AppLayout v-slot="{ toggleSidebar }">
-    <header class="topbar">
-      <div class="tb-left">
-        <button class="hamburger" type="button" aria-label="메뉴 열기" @click="toggleSidebar">☰</button>
-        <div>
-          <div class="tb-title-strong">문서 쉬운말 변환</div>
-          <div class="tb-sub">업무 문서를 쉬운 표현, 바뀐 표현, 요약으로 정리합니다.</div>
-        </div>
+  <AppLayout>
+    <main class="doq-upload">
+      <header class="doq-page-head">
+        <h1>쉬운말 검사기</h1>
+        <p>맞춤법 검사기처럼, 텍스트를 넣으면 어려운 표현을 그 자리에서 쉬운말로 바꿔 표시해 드려요.</p>
+      </header>
+
+      <div class="doq-segment">
+        <button :class="{ active: activeUploadTab === 'text' }" type="button" @click="activeUploadTab = 'text'">텍스트 입력</button>
+        <button :class="{ active: activeUploadTab === 'file' }" type="button" @click="activeUploadTab = 'file'">파일 첨부</button>
       </div>
-    </header>
 
-    <main class="content">
-      <section class="work-grid">
-        <article class="card">
-          <div class="card-head">
-            <div>
-              <h2>텍스트 직접 입력</h2>
-              <p>보고서, 공지, 메일, 회의록 내용을 붙여넣어 바로 변환합니다.</p>
-            </div>
-            <button class="btn btn-primary" type="button" :disabled="!textInput.trim() || converting" @click="convertInput">
-              {{ converting ? "변환 중" : "변환" }}
-            </button>
+      <template v-if="activeUploadTab === 'text'">
+        <section v-if="!conversion" class="doq-editor">
+          <div class="doq-editor-head"><strong>변환할 내용</strong><span>{{ textInput.length.toLocaleString() }} / 5,000자</span></div>
+          <textarea v-model="textInput" maxlength="5000" placeholder="변환할 문서를 입력하세요." />
+          <div class="doq-editor-foot">
+            <span>공지·계약서·메일 어떤 글이든 붙여넣어 보세요.</span>
+            <button type="button" :disabled="!textInput.trim() || converting" @click="convertInput">{{ converting ? "검사 중..." : "쉬운말로 검사하기 →" }}</button>
           </div>
+        </section>
 
-          <textarea
-            v-model="textInput"
-            class="textarea"
-            placeholder="변환할 업무 문서를 입력하세요."
-          />
+        <section v-else class="doq-result-grid">
+          <article class="doq-result">
+            <div class="doq-result-head">
+              <div><strong>변환 결과</strong><span>{{ changedTerms.length }}곳 바뀜</span></div>
+              <button type="button" @click="conversion = null">새로 입력</button>
+            </div>
+            <p class="doq-result-help">밑줄 친 표현을 누르면 원래 말과 뜻을 볼 수 있어요.</p>
+            <div class="doq-divider" />
+            <div class="doq-reader">{{ convertedText }}</div>
+            <div v-if="conversion.summary" class="doq-summary"><strong>핵심 요약</strong><p>{{ conversion.summary }}</p></div>
+          </article>
 
-          <div v-if="conversion" class="result">
-            <section class="converted-card">
-              <div class="section-head">
-                <div>
-                  <div class="label">변환문</div>
-                  <p>어려운 표현을 쉬운말로 바꾼 결과입니다.</p>
-                </div>
-                <span class="count-badge">{{ changedTerms.length }}개 변경</span>
-              </div>
-              <div class="converted-text">{{ convertedText }}</div>
-            </section>
-
-            <section v-if="changedTerms.length" class="changed-card">
-              <div class="label">바뀐 표현</div>
-              <div class="change-list">
-                <button
-                  v-for="item in changedTerms"
-                  :key="item.id"
-                  class="change-chip"
-                  type="button"
-                  @click="selectedChange = item"
-                >
-                  <span class="old-word">{{ item.from }}</span>
-                  <span>→</span>
-                  <strong>{{ item.to }}</strong>
-                </button>
-              </div>
-              <div v-if="selectedChange" class="change-detail">
-                <strong>{{ selectedChange.from }} → {{ selectedChange.to }}</strong>
-                <span>{{ selectedChange.definition || "설명 정보가 없습니다." }}</span>
-              </div>
-            </section>
-
-            <section class="summary">
-              <div class="label">핵심 요약</div>
-              <p>{{ conversion.summary || "요약할 내용이 없습니다." }}</p>
-            </section>
-
-            <div class="download-row">
-              <select v-model="downloadMode" class="select">
-                <option value="converted">변환문만</option>
-                <option value="comparison">원문 + 변환문</option>
-                <option value="summary">문단 요약 포함</option>
-              </select>
-              <button class="btn btn-outline" type="button" :disabled="downloadingText" @click="downloadText">
-                DOCX 다운로드
+          <aside class="doq-result-side">
+            <section class="doq-changes">
+              <strong>바뀐 표현</strong>
+              <button v-for="item in changedTerms" :key="item.id" type="button" :class="{ active: selectedChange?.id === item.id }" @click="selectedChange = item">
+                <span>{{ item.from }}</span><b>→</b><em>{{ item.to }}</em>
               </button>
-            </div>
-
-            <section class="compare-list">
-              <article v-for="(p, index) in conversion.paragraphs" :key="index" class="compare-card">
-                <div class="para-no">{{ index + 1 }}</div>
-                <div>
-                  <div class="mini-label">원문</div>
-                  <p>{{ p.original }}</p>
-                  <div class="down-arrow">↓</div>
-                  <div class="mini-label">변환문</div>
-                  <p class="easy">{{ p.easy || p.original }}</p>
-                  <div v-if="paragraphChanges(index).length" class="inline-changes">
-                    <span v-for="item in paragraphChanges(index)" :key="item.id">
-                      {{ item.from }} → {{ item.to }}
-                    </span>
-                  </div>
-                </div>
-              </article>
+              <p v-if="selectedChange">{{ selectedChange.definition || "더 쉬운 업무 표현으로 바꿨어요." }}</p>
             </section>
-          </div>
-        </article>
-
-        <article class="card">
-          <div class="card-head">
-            <div>
-              <h2>파일 업로드</h2>
-              <p>PDF, DOCX, TXT 파일을 저장하고 변환 결과를 내 문서함에서 다시 확인합니다.</p>
+            <div class="doq-result-actions">
+              <button type="button" @click="copyConvertedText">복사</button>
+              <button type="button" :disabled="downloadingText" @click="downloadText">{{ downloadingText ? "저장 중" : "저장" }}</button>
             </div>
+          </aside>
+        </section>
+      </template>
+
+      <template v-else>
+        <section class="doq-file-card">
+          <div class="doq-drop" :class="{ dragging }" @dragenter.prevent="onDragEnter" @dragleave.prevent="onDragLeave" @dragover.prevent @drop.prevent="onDrop">
+            <div class="doq-upload-icon">↑</div>
+            <strong>파일을 끌어다 놓으세요</strong>
+            <p>문서 원래 모양 그대로, 쉬운말이 적용되어 보여요 · PDF, DOCX, TXT</p>
+            <input ref="fileInput" class="hidden" type="file" accept=".pdf,.docx,.txt" @change="onPick" />
+            <button type="button" @click="pickFile">파일 선택</button>
           </div>
-
-          <div
-            class="dropzone"
-            :class="{ dragging }"
-            @dragenter.prevent="onDragEnter"
-            @dragleave.prevent="onDragLeave"
-            @dragover.prevent
-            @drop.prevent="onDrop"
-          >
-            <div class="dz-title">파일을 끌어오거나 선택하세요.</div>
-            <div class="dz-desc">지원 형식: PDF, DOCX, TXT</div>
-
-            <input
-              ref="fileInput"
-              type="file"
-              class="hidden"
-              accept=".pdf,.docx,.txt"
-              @change="onPick"
-            />
-
-            <div class="dz-actions">
-              <button class="btn btn-primary" type="button" @click="pickFile">파일 선택</button>
-              <button class="btn btn-ghost" type="button" :disabled="!selectedFile || uploading" @click="clearFile">
-                선택 해제
-              </button>
-            </div>
+          <div v-if="selectedFile" class="doq-selected-file">
+            <span class="doq-file-type">{{ fileExt(selectedFile.name) }}</span>
+            <div><strong>{{ selectedFile.name }}</strong><small>{{ humanSize(selectedFile.size) }} · 방금 첨부됨</small></div>
+            <button type="button" :disabled="uploading" @click="startUpload">{{ uploading ? `변환 중 ${progress}%` : "변환" }}</button>
           </div>
+        </section>
+      </template>
 
-          <div v-if="selectedFile" class="selected">
-            <div>
-              <div class="file-name">{{ selectedFile.name }}</div>
-              <div class="muted">{{ humanSize(selectedFile.size) }} · {{ selectedFile.type || fileExt(selectedFile.name) }}</div>
-            </div>
-            <button class="btn btn-primary" type="button" :disabled="uploading" @click="startUpload">
-              {{ uploading ? "업로드 중" : "업로드 시작" }}
-            </button>
-          </div>
-
-          <div v-if="uploading" class="progress">
-            <div class="bar" :style="{ width: `${progress}%` }"></div>
-          </div>
-
-          <div class="notice">
-            민감정보가 포함된 문서는 업로드 전에 확인하세요. AI 변환 결과는 원문 의미와 다를 수 있어 최종 확인이 필요합니다.
-          </div>
-        </article>
-      </section>
+      <div class="doq-warning">AI 변환 결과는 원문 의미와 다를 수 있어요. 중요한 문서는 원문도 함께 확인해 주세요.</div>
     </main>
+
+
   </AppLayout>
 </template>
 
@@ -194,6 +111,7 @@ interface ConversionResult {
 
 const router = useRouter();
 const DEFAULT_INTENSITY: AssistIntensity = "easy";
+const activeUploadTab = ref<"text" | "file">("text");
 const textInput = ref("");
 const conversion = ref<ConversionResult | null>(null);
 const converting = ref(false);
@@ -249,10 +167,6 @@ watch(changedTerms, (items) => {
   selectedChange.value = items[0] || null;
 });
 
-function paragraphChanges(index: number) {
-  return changedTerms.value.filter((item) => item.paragraphIndex === index);
-}
-
 async function convertInput() {
   const text = textInput.value.trim();
   if (!text) return;
@@ -265,6 +179,14 @@ async function convertInput() {
     alert("텍스트 변환에 실패했습니다.");
   } finally {
     converting.value = false;
+  }
+}
+
+async function copyConvertedText() {
+  try {
+    await navigator.clipboard.writeText(convertedText.value);
+  } catch (error) {
+    console.error("Copy failed", error);
   }
 }
 
@@ -321,12 +243,6 @@ function onDrop(e: DragEvent) {
   selectedFile.value = e.dataTransfer?.files?.[0] ?? null;
 }
 
-function clearFile() {
-  if (uploading.value) return;
-  selectedFile.value = null;
-  if (fileInput.value) fileInput.value.value = "";
-}
-
 function fileExt(name: string) {
   return name.split(".").pop()?.toUpperCase() || "UNKNOWN";
 }
@@ -359,6 +275,7 @@ async function startUpload() {
     progress.value = 100;
     window.clearInterval(timer);
     await new Promise((resolve) => setTimeout(resolve, 350));
+    localStorage.setItem("last_document_id", String(res.data.id));
     router.push({ name: "documentView", params: { id: res.data.id } }).catch(() => {});
   } catch (e: any) {
     console.error(e);
@@ -379,327 +296,58 @@ async function startUpload() {
 }
 </script>
 
+
 <style scoped>
-.topbar {
-  min-height: 76px;
-  background: var(--topbar-bg);
-  border-bottom: 1px solid var(--line);
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0 18px;
-  gap: 12px;
-}
-
-.tb-left {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.hamburger,
-.btn {
-  height: 40px;
-  min-height: 40px;
-  border: 1px solid var(--field-border);
-  background: var(--button-bg);
-  color: var(--button-text);
-  border-radius: 8px;
-  padding: 0 12px;
-  font: inherit;
-  font-weight: 900;
-  cursor: pointer;
-}
-
-.hamburger {
-  width: 42px;
-  padding: 0;
-  font-size: 19px;
-}
-
-.tb-title-strong {
-  color: var(--ink);
-  font-weight: 900;
-  font-size: 18px;
-}
-
-.tb-sub,
-.muted,
-.card p,
-.section-head p,
-.notice {
-  color: var(--muted);
-  font-size: 13px;
-}
-
-.content {
-  max-width: 1120px;
-  width: 100%;
-  margin: 0 auto;
-  padding: 18px 16px 36px;
-}
-
-.work-grid,
-.result,
-.compare-list {
-  display: grid;
-  gap: 14px;
-}
-
-.card,
-.converted-card,
-.changed-card,
-.summary,
-.compare-card {
-  background: var(--card);
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  padding: 16px;
-}
-
-.card-head,
-.section-head,
-.download-row,
-.selected {
-  display: flex;
-  justify-content: space-between;
-  gap: 12px;
-  align-items: flex-start;
-  flex-wrap: wrap;
-}
-
-.card h2 {
-  margin: 0;
-  color: var(--ink);
-  font-size: 18px;
-}
-
-.card p,
-.section-head p {
-  margin: 5px 0 0;
-  line-height: 1.55;
-}
-
-.textarea {
-  width: 100%;
-  min-height: 220px;
-  resize: vertical;
-  border: 1px solid var(--field-border);
-  border-radius: 8px;
-  padding: 12px;
-  background: var(--field-bg);
-  color: var(--ink);
-  line-height: 1.6;
-  font: inherit;
-  box-sizing: border-box;
-}
-
-.result {
-  margin-top: 14px;
-}
-
-.label,
-.mini-label {
-  color: var(--ink);
-  font-weight: 900;
-}
-
-.mini-label {
-  color: var(--muted);
-  font-size: 12px;
-}
-
-.converted-text {
-  margin-top: 12px;
-  padding: 16px;
-  min-height: 120px;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  background: var(--field-bg);
-  color: var(--ink);
-  white-space: pre-wrap;
-  line-height: 1.75;
-  font-weight: 750;
-}
-
-.count-badge,
-.change-chip,
-.inline-changes span {
-  border: 1px solid var(--accent-border);
-  background: var(--accent-soft);
-  color: var(--accent);
-  border-radius: 8px;
-  padding: 5px 8px;
-  font-size: 12px;
-  font-weight: 900;
-}
-
-.change-list,
-.inline-changes {
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
-  margin-top: 10px;
-}
-
-.change-chip {
-  display: inline-flex;
-  gap: 6px;
-  align-items: center;
-  font: inherit;
-  cursor: pointer;
-}
-
-.old-word {
-  color: var(--muted);
-  text-decoration: line-through;
-}
-
-.change-detail {
-  margin-top: 12px;
-  padding: 12px;
-  border-radius: 8px;
-  background: var(--field-bg);
-  color: var(--ink);
-  display: grid;
-  gap: 5px;
-}
-
-.summary p,
-.compare-card p {
-  margin: 5px 0 0;
-  color: var(--ink);
-  line-height: 1.7;
-}
-
-.compare-card {
-  display: grid;
-  grid-template-columns: 34px minmax(0, 1fr);
-  gap: 12px;
-}
-
-.para-no {
-  width: 32px;
-  height: 32px;
-  border-radius: 8px;
-  background: var(--accent-soft);
-  color: var(--accent);
-  display: grid;
-  place-items: center;
-  font-weight: 900;
-  font-size: 12px;
-}
-
-.down-arrow {
-  margin: 8px 0;
-  color: var(--accent);
-  font-weight: 1000;
-}
-
-.easy {
-  font-weight: 800;
-}
-
-.download-row {
-  justify-content: flex-end;
-  align-items: center;
-}
-
-.dropzone {
-  border: 2px dashed var(--field-border);
-  border-radius: 8px;
-  min-height: 180px;
-  display: grid;
-  place-items: center;
-  align-content: center;
-  text-align: center;
-  gap: 10px;
-  background: var(--field-bg);
-}
-
-.dropzone.dragging {
-  border-color: var(--accent);
-  background: var(--accent-soft);
-}
-
-.dz-title,
-.file-name {
-  color: var(--ink);
-  font-weight: 900;
-  font-size: 16px;
-}
-
-.dz-desc,
-.notice {
-  color: var(--muted);
-  font-size: 12px;
-}
-
-.dz-actions {
-  display: flex;
-  gap: 8px;
-  align-items: center;
-  justify-content: center;
-  flex-wrap: wrap;
-}
-
-.selected {
-  margin-top: 12px;
-  align-items: center;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  padding: 12px;
-}
-
-.progress {
-  margin-top: 12px;
-  height: 10px;
-  background: var(--accent-soft);
-  border-radius: 999px;
-  overflow: hidden;
-}
-
-.bar {
-  height: 100%;
-  background: var(--accent);
-  transition: width 140ms linear;
-}
-
-.notice {
-  margin-top: 12px;
-  line-height: 1.6;
-}
-
-.hidden {
-  display: none;
-}
-
-.btn:disabled {
-  opacity: 0.55;
-  cursor: not-allowed;
-}
-
-.btn-primary {
-  background: var(--accent);
-  border-color: var(--accent);
-  color: #fff;
-}
-
-.btn-outline {
-  background: var(--card);
-}
-
-.btn-ghost {
-  background: transparent;
-}
-
-.select {
-  height: 40px;
-  border: 1px solid var(--field-border);
-  border-radius: 8px;
-  padding: 0 10px;
-  background: var(--card);
-  color: var(--ink);
-  font-weight: 800;
-}
+.doq-upload { width: min(1060px, 100%); margin: 0 auto; padding: 34px 40px 56px; }
+.doq-page-head h1 { margin: 0 0 5px; font-size: 24px; letter-spacing: -.01em; }
+.doq-page-head p { margin: 0 0 22px; color: var(--muted); font-size: 14px; }
+.doq-segment { width: fit-content; margin-bottom: 20px; padding: 4px; display: flex; gap: 5px; border-radius: 13px; background: var(--soft); }
+.doq-segment button { padding: 8px 15px; border: 0; border-radius: 9px; color: var(--muted); background: transparent; font-size: 13px; font-weight: 600; cursor: pointer; }
+.doq-segment button.active { color: var(--ink); background: var(--surface); box-shadow: 0 1px 3px rgb(30 20 70 / .1); }
+.doq-editor, .doq-result, .doq-changes, .doq-file-card { border: 1px solid var(--line); border-radius: 20px; background: var(--surface); }
+.doq-editor { padding: 22px 22px 18px; }
+.doq-editor-head { margin-bottom: 12px; display: flex; justify-content: space-between; font-size: 14px; }
+.doq-editor-head span { color: var(--muted); font-size: 12px; }
+.doq-editor textarea { width: 100%; min-height: 220px; padding: 16px; resize: vertical; border: 1.5px solid var(--line); border-radius: 14px; outline: none; color: var(--ink); background: var(--soft); font-size: 15px; line-height: 1.85; }
+.doq-editor textarea:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+.doq-editor-foot { margin-top: 14px; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.doq-editor-foot > span { color: var(--muted); font-size: 12.5px; }
+.doq-editor-foot button, .doq-selected-file > button { height: 46px; padding: 0 22px; border: 0; border-radius: 13px; color: #fff; background: var(--accent-gradient); box-shadow: 0 8px 18px rgb(106 77 255 / .24); font-size: 14px; font-weight: 600; cursor: pointer; }
+.doq-editor-foot button:disabled { opacity: .5; cursor: default; }
+.doq-result-grid { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 18px; align-items: start; }
+.doq-result { padding: 26px 30px; }
+.doq-result-head { display: flex; align-items: center; justify-content: space-between; }
+.doq-result-head > div { display: flex; align-items: center; gap: 9px; }
+.doq-result-head strong { font-size: 15px; }
+.doq-result-head span { padding: 4px 10px; border-radius: 999px; color: #0c7a68; background: #e7f8f3; font-size: 11.5px; font-weight: 600; }
+.doq-result-head > button { height: 34px; padding: 0 13px; border: 1px solid var(--line); border-radius: 10px; color: var(--muted); background: var(--surface); font-size: 12.5px; font-weight: 600; cursor: pointer; }
+.doq-result-help { margin: 6px 0 18px; color: var(--muted); font-size: 12.5px; }
+.doq-divider { height: 1px; margin-bottom: 22px; background: var(--line); }
+.doq-reader { min-height: 180px; white-space: pre-wrap; color: var(--sub); font-size: 16.5px; line-height: 2.05; }
+.doq-summary { margin-top: 24px; padding: 16px 18px; border-radius: 14px; background: var(--soft); }
+.doq-summary strong { font-size: 13px; }.doq-summary p { margin: 6px 0 0; color: var(--sub); font-size: 13.5px; line-height: 1.7; }
+.doq-result-side { display: flex; flex-direction: column; gap: 14px; }
+.doq-changes { padding: 18px; display: flex; flex-direction: column; gap: 8px; }
+.doq-changes > strong { margin-bottom: 6px; font-size: 14px; }
+.doq-changes > button { width: 100%; padding: 10px 11px; display: flex; align-items: center; gap: 6px; border: 1px solid var(--line); border-radius: 10px; color: var(--ink); background: var(--surface); text-align: left; cursor: pointer; }
+.doq-changes > button.active { border-color: var(--accent-border); background: var(--accent-soft); }
+.doq-changes button span { color: #a09eae; text-decoration: line-through; }.doq-changes button b { color: var(--accent); }.doq-changes button em { font-style: normal; font-weight: 600; }
+.doq-changes > p { margin: 6px 0 0; color: var(--muted); font-size: 12.5px; line-height: 1.6; }
+.doq-result-actions { display: flex; gap: 8px; }
+.doq-result-actions button { height: 42px; flex: 1; border: 1px solid var(--line); border-radius: 12px; color: var(--sub); background: var(--surface); font-size: 13px; font-weight: 600; cursor: pointer; }
+.doq-result-actions button:last-child { border-color: #191527; color: #fff; background: #191527; }
+.doq-file-card { padding: 24px; }
+.doq-drop { padding: 44px 20px; border: 2px dashed #d9d5ec; border-radius: 16px; background: var(--soft); text-align: center; }
+.doq-drop.dragging { border-color: var(--accent); background: var(--accent-soft); }
+.doq-upload-icon { width: 56px; height: 56px; margin: 0 auto 16px; display: grid; place-items: center; border-radius: 16px; color: #fff; background: var(--accent-gradient); box-shadow: 0 8px 18px rgb(106 77 255 / .26); font-size: 28px; }
+.doq-drop > strong { display: block; margin-bottom: 5px; font-size: 15px; }.doq-drop > p { margin: 0 0 18px; color: var(--muted); font-size: 12.5px; }
+.doq-drop > button { height: 42px; padding: 0 20px; border: 0; border-radius: 12px; color: #fff; background: #191527; font-size: 13.5px; font-weight: 600; cursor: pointer; }
+.doq-selected-file { margin-top: 16px; padding: 13px 15px; display: flex; align-items: center; gap: 12px; border: 1px solid var(--line); border-radius: 13px; background: var(--soft); }
+.doq-file-type { width: 36px; height: 36px; display: grid; place-items: center; flex: none; border-radius: 10px; color: #e14a6b; background: #fdecef; font-size: 9px; font-weight: 700; }
+.doq-selected-file > div { min-width: 0; display: grid; flex: 1; }.doq-selected-file strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13.5px; }.doq-selected-file small { margin-top: 2px; color: var(--muted); font-size: 12px; }
+.doq-selected-file > button { height: 36px; padding: 0 14px; border-radius: 10px; font-size: 12.5px; }
+.doq-warning { margin-top: 18px; padding: 14px 18px; border: 1px solid #f6e6c8; border-radius: 14px; color: #8a6a2a; background: #fff7ea; font-size: 13px; line-height: 1.6; }
+[data-theme="dark"] .doq-warning { color: #e9c67d; background: #2d281f; }
+@media (max-width: 800px) { .doq-result-grid { grid-template-columns: 1fr; }.doq-result-side { display: grid; grid-template-columns: 1fr; } }
+@media (max-width: 620px) { .doq-upload { padding: 24px 18px 40px; }.doq-editor-foot { align-items: stretch; flex-direction: column; }.doq-result { padding: 22px 18px; }.doq-drop { padding: 34px 16px; }.doq-selected-file { align-items: flex-start; flex-wrap: wrap; }.doq-selected-file > button { width: 100%; } }
 </style>

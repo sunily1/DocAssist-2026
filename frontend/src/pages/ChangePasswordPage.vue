@@ -162,7 +162,7 @@ function cancel() {
   font-weight: 900;
 }
 .input:focus {
-  border-color: #2563eb;
+  border-color: var(--accent);
   box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
 }
 
@@ -190,11 +190,11 @@ function cancel() {
   border: 1px solid transparent;
 }
 .btn-primary {
-  background: #2563eb;
+  background: var(--accent-gradient);
   color: #fff;
 }
 .btn-primary:hover {
-  background: #1d4ed8;
+  filter: brightness(1.04);
 }
 .btn-primary:disabled {
   opacity: 0.7;
@@ -210,4 +210,3 @@ function cancel() {
   color: var(--ink);
 }
 </style>
-

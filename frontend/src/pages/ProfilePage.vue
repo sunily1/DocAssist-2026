@@ -1,274 +1,68 @@
 <!-- 인수인계용: 프로필/환경 설정 화면 -->
 <template>
-  <AppLayout v-slot="{ toggleSidebar }">
-    <!-- 상단바 -->
-    <header class="topbar">
-      <div class="tb-left">
-        <div class="tb-title">
-          <button class="hamburger" @click="toggleSidebar" aria-label="Open menu">☰</button>
-          <span class="tb-title-strong">프로필/설정</span>
-          <span class="tb-sub">· 계정 정보와 환경 설정</span>
+  <AppLayout>
+    <main class="doq-profile">
+      <h1>프로필</h1>
+      <section class="doq-profile-card">
+        <div class="doq-profile-avatar">{{ initials(user.name) }}</div>
+        <div class="doq-profile-copy">
+          <strong>{{ user.name || "이름 없음" }}</strong>
+          <span>{{ user.email }}</span>
+          <small>▣ {{ formatDate(user.joinedAt) }} 가입 · {{ daysSinceJoin }}일째</small>
         </div>
-      </div>
-      <div class="tb-right">
-        <button class="btn btn-save" @click="save">저장</button>
-      </div>
-    </header>
+        <button type="button" @click="profileModal = 'edit'">프로필 편집</button>
+      </section>
 
-    <main class="content">
-      <!-- 프로필 카드 -->
-      <section class="card profile-card">
-        <div class="pc-left">
-          <div class="avatar">
-            <div class="avatar-ring"></div>
-            <div class="avatar-img">{{ initials(user.name) }}</div>
-          </div>
-
-          <div class="pc-meta">
-            <div class="name-row">
-              <div class="name">{{ user.name || "이름 없음" }}</div>
-              <span class="role-pill">{{ roleLabel }}</span>
-            </div>
-            <div class="email muted">{{ user.email }}</div>
-
-            <div class="meta-line">
-              <span class="tag">Last login</span>
-              <span class="muted">{{ formatDateTime(user.lastLoginAt) }}</span>
-              <span class="sep">·</span>
-              <span class="tag">Joined</span>
-              <span class="muted">{{ formatDate(user.joinedAt) }}</span>
-            </div>
-          </div>
+      <section class="doq-screen-settings">
+        <h2>화면 설정</h2>
+        <div class="doq-setting-row">
+          <div><strong>테마</strong><span>밝게 / 어둡게</span></div>
+          <div class="doq-mini-segment"><button :class="{ active: theme === 'light' }" @click="setTheme('light')">밝게</button><button :class="{ active: theme === 'dark' }" @click="setTheme('dark')">어둡게</button></div>
+        </div>
+        <div class="doq-setting-row doq-size-row">
+          <div><strong>글자 크기</strong><span>읽기 편한 크기로 조절</span></div>
+          <div class="doq-mini-segment"><button :class="{ active: ui.fontSize === 'sm' }" @click="setFontSize('sm')">작게</button><button :class="{ active: ui.fontSize === 'md' }" @click="setFontSize('md')">중간</button><button :class="{ active: ui.fontSize === 'lg' }" @click="setFontSize('lg')">크게</button><button :class="{ active: ui.fontSize === 'custom' }" @click="setFontSize('custom')">커스텀</button></div>
+          <div v-if="ui.fontSize === 'custom'" class="doq-custom-size"><input type="range" min="12" max="24" step="1" v-model.number="ui.customFontSize" @input="setCustomFontSize(ui.customFontSize)" /><span>{{ ui.customFontSize }}px</span></div>
+        </div>
+        <div class="doq-setting-row">
+          <div><strong>변환 알림</strong><span>문서 변환이 끝나면 알려드려요</span></div>
+          <button class="doq-toggle" :class="{ on: ui.sentenceMode }" type="button" role="switch" :aria-checked="ui.sentenceMode" @click="toggleNotification"><span /></button>
         </div>
       </section>
 
-      <!-- ✅ 3개 카드 그리드 -->
-      <section class="grid">
-        <!-- 챗봇 답변 설정 -->
-        <article class="card card-eq">
-          <div class="card-head">
-            <h2>챗봇 답변 설정</h2>
-            <div class="badge">Chatbot</div>
-          </div>
-
-          <div class="form form-eq">
-            <div class="field">
-              <div class="label">챗봇 답변 방식</div>
-              <div class="seg">
-                <button
-                  :class="['seg-btn', assist.level === 'close' && 'on']"
-                  @click="assist.level = 'close'"
-                >
-                  원문형
-                </button>
-                <button
-                  :class="['seg-btn', assist.level === 'easy' && 'on']"
-                  @click="assist.level = 'easy'"
-                >
-                  쉽게 설명
-                </button>
-                <button
-                  :class="['seg-btn', assist.level === 'summary' && 'on']"
-                  @click="assist.level = 'summary'"
-                >
-                  요약 중심
-                </button>
-              </div>
-              <div class="help muted">
-                Q&A 챗봇 답변 톤에만 적용됩니다. 파일 업로드 변환은 항상 쉽게 처리됩니다.
-              </div>
-            </div>
-
-            <div class="field">
-              <div class="label">용어 설명 깊이</div>
-              <input class="range" type="range" min="1" max="5" v-model="assist.termDepth" />
-              <div class="range-row">
-                <span class="muted">간단</span>
-                <span class="mono">Lv. {{ assist.termDepth }}</span>
-                <span class="muted">자세히</span>
-              </div>
-            </div>
-
-            <div class="field">
-              <div class="label">근거 표시 방식</div>
-              <select class="select" v-model="assist.evidenceMode">
-                <option value="inline">문장 옆(Inline)</option>
-                <option value="panel">오른쪽 패널(Panel)</option>
-                <option value="hover">하이라이트 + 호버(Hover)</option>
-              </select>
-            </div>
-          </div>
-
-          <div class="card-foot">
-            <span class="foot-muted muted">일반 질문과 문서 질문의 답변 스타일을 설정합니다.</span>
-          </div>
-        </article>
-
-        <!-- 화면 표시 -->
-        <article class="card card-eq">
-          <div class="card-head">
-            <h2>화면 표시</h2>
-            <div class="badge">UI</div>
-          </div>
-
-          <div class="form form-eq">
-            <div class="field">
-              <div class="label">테마</div>
-              <div class="row">
-                <button
-                  class="btn btn-outline theme-btn"
-                  :class="{ on: theme === 'light' }"
-                  @click="setTheme('light')"
-                >
-                  라이트
-                </button>
-                <button
-                  class="btn btn-outline theme-btn"
-                  :class="{ on: theme === 'dark' }"
-                  @click="setTheme('dark')"
-                >
-                  다크
-                </button>
-              </div>
-              <div class="help muted">전 페이지 공통으로 적용됩니다.</div>
-            </div>
-
-            <div class="field">
-              <div class="label">글자 크기</div>
-              <div class="seg">
-                <button
-                  :class="['seg-btn', ui.fontSize === 'sm' && 'on']"
-                  @click="setFontSize('sm')"
-                >
-                  작게
-                </button>
-                <button
-                  :class="['seg-btn', ui.fontSize === 'md' && 'on']"
-                  @click="setFontSize('md')"
-                >
-                  보통
-                </button>
-                <button
-                  :class="['seg-btn', ui.fontSize === 'lg' && 'on']"
-                  @click="setFontSize('lg')"
-                >
-                  크게
-                </button>
-                <button
-                  :class="['seg-btn', ui.fontSize === 'custom' && 'on']"
-                  @click="setFontSize('custom')"
-                >
-                  커스텀
-                </button>
-              </div>
-              <div v-if="ui.fontSize === 'custom'" class="custom-size-panel">
-                <input
-                  class="range"
-                  type="range"
-                  min="12"
-                  max="24"
-                  step="1"
-                  v-model.number="ui.customFontSize"
-                  @input="setCustomFontSize(ui.customFontSize)"
-                />
-                <div class="custom-size-row">
-                  <span class="muted">12px</span>
-                  <label class="custom-number">
-                    <input
-                      class="input number-input"
-                      type="number"
-                      min="12"
-                      max="24"
-                      step="1"
-                      v-model.number="ui.customFontSize"
-                      @input="setCustomFontSize(ui.customFontSize)"
-                      @blur="setCustomFontSize(ui.customFontSize)"
-                    />
-                    <span>px</span>
-                  </label>
-                  <span class="muted">24px</span>
-                </div>
-              </div>
-            </div>
-
-            <div class="field">
-              <div class="label">문장 단위 표시</div>
-              <label class="toggle">
-                <input type="checkbox" v-model="ui.sentenceMode" />
-                <span class="knob"></span>
-                <span class="toggle-text muted">문장별 구분선/번호 표시</span>
-              </label>
-            </div>
-          </div>
-
-          <div class="card-foot">
-            <span class="foot-muted muted">가독성과 표시 스타일을 설정합니다.</span>
-          </div>
-        </article>
-
-        <!-- 계정 관리 -->
-        <article class="card card-eq">
-          <div class="card-head">
-            <h2>계정 관리</h2>
-            <div class="right-badges">
-              <span class="badge">Account</span>
-              <span v-if="isAdmin" class="admin-badge">🛡️ Admin</span>
-            </div>
-          </div>
-
-          <div class="form form-eq">
-            <div class="field">
-              <div class="label">이름</div>
-              <input class="input" v-model.trim="user.name" placeholder="이름" />
-            </div>
-
-            <div class="field">
-              <div class="label">이메일</div>
-              <input class="input" :value="user.email" disabled />
-            </div>
-
-            <div class="account-info">
-              <div class="info-item">
-                <span class="muted">역할</span>
-                <strong>{{ roleLabel }}</strong>
-              </div>
-              <div class="info-item">
-                <span class="muted">가입일</span>
-                <strong>{{ formatDate(user.joinedAt) }}</strong>
-              </div>
-              <div class="info-item">
-                <span class="muted">최근 로그인</span>
-                <strong>{{ formatDateTime(user.lastLoginAt) }}</strong>
-              </div>
-            </div>
-
-            <div class="field">
-              <div class="label">보안</div>
-              <button class="btn btn-primary full" @click="goChangePassword">비밀번호 변경</button>
-            </div>
-
-            <div class="field">
-              <div class="label">세션</div>
-              <button class="btn btn-ghost full" @click="logout">로그아웃</button>
-            </div>
-          </div>
-
-          <div class="card-foot">
-            <span class="foot-muted muted">계정과 보안 설정을 관리합니다.</span>
-          </div>
-        </article>
+      <section class="doq-help-card">
+        <div><strong>도움이 필요하신가요?</strong><span>사용 중 궁금한 점이나 오류를 문의해 주세요.</span></div>
+        <button type="button" @click="profileModal = 'inquiry'">문의하기</button>
       </section>
+      <button class="doq-profile-logout" type="button" @click="logout">로그아웃</button>
+
+      <div v-if="profileModal" class="doq-modal-backdrop" @click.self="profileModal = ''">
+        <section class="doq-modal">
+          <header><h2>{{ profileModal === 'edit' ? "프로필 편집" : "문의하기" }}</h2><button type="button" @click="profileModal = ''">×</button></header>
+          <template v-if="profileModal === 'edit'">
+            <div class="doq-modal-avatar">{{ initials(user.name) }}</div>
+            <label>이름<input v-model.trim="user.name" /></label>
+            <label>이메일<input :value="user.email" disabled /></label>
+            <footer><button type="button" @click="profileModal = ''">취소</button><button type="button" @click="saveProfileModal">저장</button></footer>
+          </template>
+          <template v-else>
+            <p>보통 1영업일 안에 이메일로 답변드려요.</p>
+            <label>문의 유형<select><option>사용 방법</option><option>오류 신고</option><option>기능 제안</option><option>기타</option></select></label>
+            <label>내용<textarea placeholder="궁금한 점이나 겪으신 문제를 적어 주세요." /></label>
+            <label>회신받을 이메일<input :value="user.email" /></label>
+            <footer><button type="button" @click="profileModal = ''">취소</button><button type="button" @click="submitInquiry">보내기</button></footer>
+          </template>
+        </section>
+      </div>
+      <div class="toast" :class="{ show: toast.show }">설정이 저장되었습니다</div>
     </main>
 
-    <!-- ✅ 토스트 -->
-    <div class="toast" :class="{ show: toast.show }">
-      설정이 저장되었습니다
-    </div>
+
   </AppLayout>
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from "vue";
+import { computed, onMounted, onUnmounted, reactive, ref } from "vue";
 import { useRouter } from "vue-router";
 import { useAuthStore } from "../stores/auth";
 import AppLayout from "../components/layout/AppLayout.vue";
@@ -278,9 +72,6 @@ const authStore = useAuthStore();
 
 const theme = ref<"light" | "dark">("light");
 
-const role = ref<"ADMIN" | "USER" | "">("");
-const isAdmin = computed(() => role.value === "ADMIN");
-const roleLabel = computed(() => (role.value === "ADMIN" ? "관리자" : "일반 사용자"));
 
 const user = reactive({
   name: "User",
@@ -310,6 +101,13 @@ const toast = reactive({
   show: false,
   timer: 0 as unknown as number,
 });
+const profileModal = ref<"" | "edit" | "inquiry">("");
+const settingsReady = ref(false);
+let settingsSaveTimer: number | undefined;
+const daysSinceJoin = computed(() => {
+  const joined = new Date(user.joinedAt).getTime();
+  return Number.isFinite(joined) ? Math.max(1, Math.floor((Date.now() - joined) / 86_400_000) + 1) : 1;
+});
 
 function applyTheme(next: "light" | "dark") {
   theme.value = next;
@@ -320,6 +118,7 @@ function applyTheme(next: "light" | "dark") {
 }
 function setTheme(next: "light" | "dark") {
   applyTheme(next);
+  scheduleSettingsSave();
 }
 const presetFontSize: Record<Exclude<FontSizeMode, "custom">, number> = {
   sm: 14,
@@ -354,12 +153,25 @@ function applyFontSize(mode: FontSizeMode) {
 function setFontSize(next: FontSizeMode) {
   ui.fontSize = next;
   applyFontSize(next);
+  scheduleSettingsSave();
 }
 
 function setCustomFontSize(value: unknown) {
   ui.customFontSize = clampCustomFontSize(value);
   ui.fontSize = "custom";
   applyFontSize("custom");
+  scheduleSettingsSave();
+}
+
+function toggleNotification() {
+  ui.sentenceMode = !ui.sentenceMode;
+  scheduleSettingsSave();
+}
+
+function scheduleSettingsSave() {
+  if (!settingsReady.value) return;
+  if (settingsSaveTimer) window.clearTimeout(settingsSaveTimer);
+  settingsSaveTimer = window.setTimeout(() => { void save(); }, 350);
 }
 
 function normalizeAssistLevel(value: unknown): AssistLevel {
@@ -369,10 +181,6 @@ function normalizeAssistLevel(value: unknown): AssistLevel {
   if (next === "mid") return "easy";
   if (next === "high") return "summary";
   return "easy";
-}
-
-function goChangePassword() {
-  router.push({ name: "changePassword" }).catch(() => {});
 }
 
 function logout() {
@@ -405,6 +213,17 @@ async function save() {
   }
 }
 
+async function saveProfileModal() {
+  await save();
+  profileModal.value = "";
+}
+
+function submitInquiry() {
+  profileModal.value = "";
+  toast.show = true;
+  window.setTimeout(() => { toast.show = false; }, 1800);
+}
+
 function initials(name: string) {
   const s = (name || "").trim();
   if (!s) return "U";
@@ -419,18 +238,6 @@ function formatDate(iso: string) {
   const d = new Date(iso);
   return d.toLocaleDateString("ko-KR", { year: "numeric", month: "2-digit", day: "2-digit" });
 }
-function formatDateTime(iso: string) {
-  if (!iso) return "-";
-  const d = new Date(iso);
-  return d.toLocaleString("ko-KR", {
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-}
-
 onMounted(async () => {
   const savedTheme = (localStorage.getItem("theme") as "light" | "dark") || "light";
   const savedFontSize = (localStorage.getItem("font_size") as FontSizeMode) || "md";
@@ -448,8 +255,6 @@ onMounted(async () => {
     user.email = authStore.user.email;
     user.lastLoginAt = authStore.user.last_login_at || new Date().toISOString();
     user.joinedAt = authStore.user.created_at || new Date().toISOString();
-    role.value = (authStore.user.role as "ADMIN" | "USER") || "";
-
     // 설정 복원(DB > 로컬 스토리지)
     const settings = authStore.user.profile_settings;
     if (settings) {
@@ -483,579 +288,31 @@ onMounted(async () => {
        }
     }
   }
+  settingsReady.value = true;
+});
+
+onUnmounted(() => {
+  if (settingsSaveTimer) window.clearTimeout(settingsSaveTimer);
+  if (toast.timer) window.clearTimeout(toast.timer);
 });
 </script>
 
+
 <style scoped>
-/* Main */
-.main {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-}
-
-/* Header */
-.topbar {
-  background: var(--topbar-bg);
-  border-bottom: 1px solid var(--line);
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0 18px;
-  /* height handled by AppLayout grid */
-  height: 100%;
-  gap: 12px;
-}
-.tb-left {
-  display: grid;
-  gap: 6px;
-}
-.tb-title {
-  display: flex;
-  align-items: baseline;
-  gap: 8px;
-}
-.tb-title-strong {
-  font-weight: 1000;
-  font-size: 16px;
-  letter-spacing: -0.2px;
-}
-.tb-sub {
-  color: var(--muted);
-  font-size: 12px;
-  font-weight: 700;
-}
-.tb-right {
-  display: flex;
-  gap: 10px;
-  align-items: center;
-  flex-wrap: wrap;
-}
-.muted {
-  color: var(--muted);
-  font-size: 12px;
-}
-.small {
-  font-size: 12px;
-}
-
-/* Content */
-.content {
-  max-width: 1480px;
-  width: 100%;
-  margin: 0 auto;
-  padding: 16px 12px 32px;
-  display: grid;
-  gap: 16px;
-  justify-items: stretch;
-}
-
-/* Cards */
-.card {
-  background: var(--card);
-  border: 1px solid var(--line);
-  border-radius: 18px;
-  box-shadow: var(--shadow);
-  padding: 16px;
-  backdrop-filter: blur(10px);
-}
-.profile-card {
-  padding: 18px;
-}
-
-.pc-left {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  min-width: 0;
-}
-
-.avatar {
-  position: relative;
-  width: 74px;
-  height: 74px;
-  flex: 0 0 auto;
-}
-.avatar-ring {
-  position: absolute;
-  inset: -3px;
-  border-radius: 50%;
-  background: linear-gradient(135deg, var(--b1), var(--b2));
-}
-.avatar-img {
-  position: absolute;
-  inset: 0;
-  border-radius: 50%;
-  background: var(--card-solid);
-  border: 1px solid var(--line);
-  display: grid;
-  place-items: center;
-  font-weight: 1100;
-  letter-spacing: -0.3px;
-}
-
-.pc-meta {
-  min-width: 0;
-}
-.name-row {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-.name {
-  font-weight: 1100;
-  font-size: 18px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  max-width: 520px;
-}
-.email {
-  margin-top: 2px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  max-width: 520px;
-}
-.meta-line {
-  margin-top: 8px;
-  display: flex;
-  gap: 10px;
-  align-items: center;
-  flex-wrap: wrap;
-}
-.tag {
-  font-size: 12px;
-  padding: 2px 8px;
-  border-radius: 999px;
-  border: 1px solid var(--line);
-  background: var(--button-bg);
-  font-weight: 1000;
-}
-.sep {
-  opacity: 0.6;
-}
-
-.admin-pill {
-  font-size: 12px;
-  font-weight: 1100;
-  padding: 4px 10px;
-  border-radius: 999px;
-  background: rgba(17, 24, 39, 0.1);
-  border: 1px solid rgba(17, 24, 39, 0.15);
-}
-
-.role-pill {
-  font-size: 12px;
-  font-weight: 1000;
-  padding: 4px 10px;
-  border-radius: 999px;
-  background: var(--accent-soft);
-  border: 1px solid var(--accent-border);
-  color: var(--ink);
-}
-.account-info {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 8px;
-}
-.info-item {
-  display: grid;
-  gap: 4px;
-  padding: 10px;
-  border: 1px solid var(--line);
-  border-radius: 14px;
-  background: var(--field-bg);
-  min-width: 0;
-}
-.info-item strong {
-  color: var(--ink);
-  font-size: 12px;
-  line-height: 1.35;
-  overflow-wrap: anywhere;
-}
-/* Grid equal */
-.grid {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 14px;
-  align-items: stretch;
-}
-.card-eq {
-  display: flex;
-  flex-direction: column;
-  min-height: 280px;
-}
-.form-eq {
-  display: grid;
-  gap: 12px;
-  flex: 1 1 auto;
-}
-.card-foot {
-  margin-top: 12px;
-  padding-top: 12px;
-  border-top: 1px solid var(--line);
-}
-.foot-muted {
-  font-size: 12px;
-  font-weight: 850;
-}
-
-/* Card head */
-.card-head {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  gap: 12px;
-  margin-bottom: 12px;
-}
-.card-head h2 {
-  margin: 0;
-  font-size: 16px;
-  font-weight: 1100;
-}
-.badge {
-  font-size: 12px;
-  font-weight: 1100;
-  padding: 6px 10px;
-  border-radius: 999px;
-  background: rgba(29, 78, 216, 0.1);
-  border: 1px solid rgba(29, 78, 216, 0.18);
-}
-.right-badges {
-  display: flex;
-  gap: 8px;
-  align-items: center;
-}
-.admin-badge {
-  font-size: 12px;
-  font-weight: 1100;
-  padding: 6px 10px;
-  border-radius: 999px;
-  background: rgba(17, 24, 39, 0.1);
-  border: 1px solid rgba(17, 24, 39, 0.15);
-}
-/* Fields */
-.field {
-  display: grid;
-  gap: 8px;
-}
-.label {
-  font-size: 12px;
-  font-weight: 1000;
-  color: var(--muted);
-}
-
-.input,
-.select {
-  width: 100%;
-  padding: 12px 12px;
-  border-radius: 14px;
-  border: 1px solid var(--line);
-  background: var(--field-bg);
-  outline: none;
-  font-weight: 950;
-}
-.help {
-  font-size: 12px;
-}
-.range {
-  width: 100%;
-}
-
-.custom-size-panel {
-  display: grid;
-  gap: 8px;
-  padding: 10px;
-  border: 1px solid var(--line);
-  border-radius: 14px;
-  background: var(--field-bg);
-}
-.custom-size-row {
-  display: grid;
-  grid-template-columns: auto minmax(90px, 130px) auto;
-  align-items: center;
-  gap: 10px;
-}
-.custom-number {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-weight: 1000;
-  color: var(--ink);
-}
-.number-input {
-  text-align: center;
-  padding: 8px 10px;
-}
-.range-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.seg {
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-.seg-btn {
-  border-radius: 14px;
-  padding: 10px 12px;
-  font-weight: 1100;
-  cursor: pointer;
-  border: 1px solid var(--line);
-  background: var(--field-bg);
-}
-.seg-btn.on {
-  border-color: rgba(29, 78, 216, 0.3);
-  background: rgba(29, 78, 216, 0.1);
-}
-
-.toggle {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-.toggle input {
-  display: none;
-}
-.knob {
-  width: 46px;
-  height: 26px;
-  border-radius: 999px;
-  background: rgba(148, 163, 184, 0.35);
-  position: relative;
-  border: 1px solid var(--line);
-}
-.knob::after {
-  content: "";
-  position: absolute;
-  top: 50%;
-  transform: translateY(-50%);
-  left: 3px;
-  width: 20px;
-  height: 20px;
-  border-radius: 50%;
-  background: var(--card-solid);
-  transition: all 0.18s ease;
-}
-.toggle input:checked + .knob {
-  background: rgba(29, 78, 216, 0.32);
-}
-.toggle input:checked + .knob::after {
-  left: 23px;
-}
-
-.row {
-  display: flex;
-  gap: 10px;
-  flex-wrap: wrap;
-}
-.full {
-  width: 100%;
-}
-
-.mono {
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono",
-    "Courier New", monospace;
-  font-weight: 1100;
-}
-
-/* Buttons */
-.btn {
-  border-radius: 14px;
-  padding: 10px 12px;
-  font-weight: 1100;
-  cursor: pointer;
-  border: 1px solid transparent;
-  background: var(--button-bg);
-}
-.btn-save {
-  background: linear-gradient(90deg, #2563eb, #1d4ed8);
-  color: #fff;
-  border-color: rgba(37, 99, 235, 0.35);
-}
-.btn-primary {
-  background: linear-gradient(90deg, var(--b1), var(--b2));
-  color: #fff;
-  border-color: rgba(29, 78, 216, 0.28);
-}
-.btn-outline {
-  border-color: var(--line);
-}
-.theme-btn.on {
-  background: var(--accent);
-  border-color: var(--accent);
-  color: #fff;
-}
-.theme-btn.on:hover {
-  background: #1f6feb;
-}
-.btn-ghost {
-  background: transparent;
-  border-color: var(--line);
-}
-
-/* ✅ Toast */
-.toast {
-  position: fixed;
-  right: 24px;
-  bottom: 24px;
-  padding: 12px 14px;
-  border-radius: 14px;
-  background: rgba(17, 24, 39, 0.92);
-  color: #fff;
-  font-weight: 950;
-  font-size: 13px;
-  transform: translateY(10px);
-  opacity: 0;
-  pointer-events: none;
-  transition: all 0.18s ease;
-}
-.toast.show {
-  transform: translateY(0);
-  opacity: 1;
-}
-
-.hamburger {
-  display: none;
-  font-size: 20px;
-  background: transparent;
-  border: none;
-  cursor: pointer;
-  padding: 0;
-  margin-right: 8px;
-}
-
-/* Responsive */
-@media (max-width: 1180px) {
-  .grid {
-    grid-template-columns: 1fr 1fr;
-  }
-}
-@media (max-width: 820px) {
-  .hamburger {
-    display: inline-flex;
-  }
-  .grid {
-    grid-template-columns: 1fr;
-  }
-  .card-eq {
-    min-height: auto;
-  }
-  .account-info {
-    grid-template-columns: 1fr;
-  }
-
-  .custom-size-row {
-    grid-template-columns: 1fr;
-    justify-items: stretch;
-  }
-  .custom-number {
-    justify-content: center;
-  }
-}
-
-.input,
-.select,
-.seg-btn {
-  color: var(--field-text);
-}
-
-.btn {
-  color: var(--button-text);
-}
-
-.btn-save,
-.btn-primary,
-.theme-btn.on {
-  color: #fff;
-}
-
-.input:focus,
-.select:focus {
-  border-color: var(--accent);
-  box-shadow: 0 0 0 3px var(--accent-soft);
-}
-
-.seg-btn:hover,
-.btn:hover {
-  background: var(--button-hover);
-}
-
-.seg-btn.on,
-.badge {
-  border-color: var(--accent-border);
-  background: var(--accent-soft);
-}
-
-:global([data-theme="dark"]) .topbar {
-  background: var(--topbar-bg);
-  border-bottom-color: var(--line);
-}
-
-:global([data-theme="dark"]) .profile-card {
-  background: linear-gradient(135deg, rgb(91 140 255 / 0.1), rgb(33 199 183 / 0.05)), var(--card);
-}
-
-:global([data-theme="dark"]) .card {
-  background: var(--card);
-  border-color: var(--line);
-  box-shadow: var(--shadow);
-}
-
-:global([data-theme="dark"]) .avatar-img,
-:global([data-theme="dark"]) .tag,
-:global([data-theme="dark"]) .admin-pill,
-:global([data-theme="dark"]) .admin-badge,
-:global([data-theme="dark"]) .badge {
-  background: var(--accent-soft);
-  border-color: var(--accent-border);
-  color: var(--ink);
-}
-
-:global([data-theme="dark"]) .input,
-:global([data-theme="dark"]) .select,
-:global([data-theme="dark"]) .seg-btn,
-:global([data-theme="dark"]) .btn {
-  background: var(--field-bg);
-  border-color: var(--field-border);
-  color: var(--field-text);
-}
-
-:global([data-theme="dark"]) .seg-btn:hover,
-:global([data-theme="dark"]) .btn:hover {
-  background: var(--button-hover);
-}
-
-:global([data-theme="dark"]) .seg-btn.on,
-:global([data-theme="dark"]) .theme-btn.on,
-:global([data-theme="dark"]) .btn-save,
-:global([data-theme="dark"]) .btn-primary {
-  background: linear-gradient(135deg, var(--accent), var(--accent-2));
-  border-color: transparent;
-  color: #fff;
-}
-
-:global([data-theme="dark"]) .btn-ghost,
-:global([data-theme="dark"]) .btn-outline {
-  background: transparent;
-  border-color: var(--field-border);
-  color: var(--ink);
-}
-
-:global([data-theme="dark"]) .knob {
-  background: #0d1017;
-  border-color: var(--field-border);
-}
-
-:global([data-theme="dark"]) .toggle input:checked + .knob {
-  background: var(--accent-soft);
-  border-color: var(--accent-border);
-}
-
-:global([data-theme="dark"]) .hamburger {
-  color: var(--ink);
-}
+.doq-profile { width: min(760px, 100%); margin: 0 auto; padding: 34px 40px 56px; }.doq-profile > h1 { margin: 0 0 24px; font-size: 24px; letter-spacing: -.01em; }
+.doq-profile-card { margin-bottom: 16px; padding: 24px; display: flex; align-items: center; gap: 18px; border: 1px solid var(--line); border-radius: 20px; background: var(--surface); }
+.doq-profile-avatar, .doq-modal-avatar { display: grid; place-items: center; flex: none; color: #fff; background: linear-gradient(135deg,#ffb86b,#ff7eb3); font-weight: 700; }.doq-profile-avatar { width: 64px; height: 64px; border-radius: 20px; font-size: 24px; }.doq-profile-copy { min-width: 0; display: grid; flex: 1; }.doq-profile-copy > strong { font-size: 18px; }.doq-profile-copy > span { margin-top: 3px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); font-size: 13.5px; }.doq-profile-copy > small { margin-top: 8px; color: var(--muted); font-size: 12.5px; }
+.doq-profile-card > button { height: 40px; padding: 0 16px; border: 1px solid var(--line); border-radius: 12px; color: var(--sub); background: var(--surface); font-size: 13.5px; font-weight: 600; cursor: pointer; }
+.doq-screen-settings { margin-bottom: 16px; padding: 24px; border: 1px solid var(--line); border-radius: 20px; background: var(--surface); }.doq-screen-settings h2 { margin: 0 0 18px; font-size: 16px; }
+.doq-setting-row { min-height: 66px; padding: 12px 0; display: flex; align-items: center; justify-content: space-between; gap: 12px; border-bottom: 1px solid var(--line); }.doq-setting-row:last-child { border-bottom: 0; }.doq-setting-row > div:first-child { display: grid; }.doq-setting-row > div:first-child strong { font-size: 14px; font-weight: 500; }.doq-setting-row > div:first-child span { margin-top: 2px; color: var(--muted); font-size: 12.5px; }
+.doq-mini-segment { padding: 3px; display: flex; gap: 3px; border-radius: 10px; background: var(--soft); }.doq-mini-segment button { padding: 7px 12px; border: 0; border-radius: 8px; color: var(--muted); background: transparent; font-size: 12.5px; font-weight: 600; cursor: pointer; }.doq-mini-segment button.active { color: var(--ink); background: var(--surface); box-shadow: 0 1px 3px rgb(0 0 0 / .08); }
+.doq-size-row { flex-wrap: wrap; }.doq-custom-size { width: 100%; display: flex; align-items: center; gap: 12px; }.doq-custom-size input { flex: 1; accent-color: var(--accent); }.doq-custom-size span { min-width: 46px; color: var(--ink); font-family: "Space Grotesk", sans-serif; font-size: 13px; font-weight: 600; text-align: right; }
+.doq-toggle { width: 44px; height: 26px; padding: 3px; border: 0; border-radius: 999px; background: var(--line); cursor: pointer; transition: background .2s; }.doq-toggle span { width: 20px; height: 20px; display: block; border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgb(0 0 0 / .2); transition: transform .2s; }.doq-toggle.on { background: var(--accent-gradient); }.doq-toggle.on span { transform: translateX(18px); }
+.doq-help-card { margin-bottom: 16px; padding: 20px 24px; display: flex; align-items: center; justify-content: space-between; gap: 16px; border: 1px solid var(--line); border-radius: 20px; background: var(--surface); }.doq-help-card > div { display: grid; }.doq-help-card strong { font-size: 15px; }.doq-help-card span { margin-top: 3px; color: var(--muted); font-size: 13px; }.doq-help-card button { height: 40px; padding: 0 18px; flex: none; border: 0; border-radius: 12px; color: #fff; background: var(--accent-gradient); font-size: 13.5px; font-weight: 600; cursor: pointer; }
+.doq-profile-logout { width: 100%; height: 48px; border: 1px solid #f2d4d4; border-radius: 14px; color: #d0524a; background: var(--surface); font-size: 14px; font-weight: 600; cursor: pointer; }
+.toast { position: fixed; left: 50%; bottom: 28px; z-index: 1300; padding: 11px 18px; transform: translate(-50%, 14px); border: 1px solid var(--line); border-radius: 12px; color: var(--ink); background: var(--surface); box-shadow: 0 12px 30px rgb(20 15 45 / .16); opacity: 0; visibility: hidden; pointer-events: none; transition: opacity .2s, transform .2s, visibility .2s; }
+.toast.show { transform: translate(-50%, 0); opacity: 1; visibility: visible; }
+.doq-modal-backdrop { position: fixed; inset: 0; z-index: 1200; padding: 20px; display: grid; place-items: center; background: rgb(15 10 40 / .5); }.doq-modal { width: min(440px, 100%); padding: 26px; border: 1px solid var(--line); border-radius: 20px; background: var(--surface); box-shadow: 0 30px 70px rgb(0 0 0 / .35); }.doq-modal header { margin-bottom: 20px; display: flex; align-items: center; justify-content: space-between; }.doq-modal h2 { margin: 0; font-size: 18px; }.doq-modal header button { width: 30px; height: 30px; border: 0; border-radius: 9px; color: var(--muted); background: var(--soft); cursor: pointer; }.doq-modal > p { margin: -12px 0 18px; color: var(--muted); font-size: 13px; }
+.doq-modal-avatar { width: 64px; height: 64px; margin-bottom: 20px; border-radius: 20px; font-size: 24px; }.doq-modal label { display: grid; gap: 6px; margin-bottom: 14px; color: var(--sub); font-size: 13px; font-weight: 600; }.doq-modal input, .doq-modal select, .doq-modal textarea { width: 100%; border: 1.5px solid var(--line); border-radius: 12px; color: var(--ink); background: var(--soft); font-size: 14px; }.doq-modal input, .doq-modal select { height: 44px; padding: 0 14px; }.doq-modal textarea { min-height: 120px; padding: 12px 14px; resize: vertical; }.doq-modal footer { margin-top: 22px; display: flex; justify-content: flex-end; gap: 10px; }.doq-modal footer button { height: 44px; padding: 0 18px; border: 1px solid var(--line); border-radius: 12px; color: var(--sub); background: var(--surface); font-size: 14px; font-weight: 600; cursor: pointer; }.doq-modal footer button:last-child { padding: 0 22px; border: 0; color: #fff; background: var(--accent-gradient); }
+@media (max-width: 620px) { .doq-profile { padding: 24px 18px 40px; }.doq-profile-card { align-items: flex-start; flex-wrap: wrap; }.doq-profile-card > button { width: 100%; }.doq-setting-row { align-items: flex-start; flex-direction: column; }.doq-mini-segment { width: 100%; }.doq-mini-segment button { flex: 1; padding-inline: 5px; }.doq-help-card { align-items: flex-start; flex-direction: column; }.doq-help-card button { width: 100%; } }
 </style>

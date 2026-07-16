@@ -136,12 +136,12 @@
   
   <style scoped>
   :root {
-    --b1: #1d4ed8;
-    --b2: #0ea5e9;
+    --b1: var(--accent);
+    --b2: var(--accent-2);
     --ink: #111827;
     --muted: #6b7280;
     --line: #e5e7eb;
-    --ring: rgba(29, 78, 216, 0.18);
+    --ring: var(--accent-soft);
   }
   
   .page {
@@ -232,7 +232,7 @@
     border-radius: 999px;
     border: 1px solid #bfdbfe;
     background: #eff6ff;
-    color: #1d4ed8;
+    color: var(--accent-strong);
     font-weight: 900;
   }
   .token-pill.warn{
@@ -321,7 +321,7 @@
     border-radius: 8px;
     font-size: 12px;
   }
-  .link:hover { background: rgba(29, 78, 216, 0.08); }
+  .link:hover { background: var(--accent-soft); }
   .link.strong { padding: 0 6px; }
   
   @media (max-width: 900px) {
@@ -332,7 +332,6 @@
   }
   </style>
   
-
 
 
 

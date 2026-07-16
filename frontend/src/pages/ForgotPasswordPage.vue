@@ -240,7 +240,7 @@ async function submit() {
 .btn:disabled { opacity: 0.6; cursor: not-allowed; }
 .btn-primary {
   color: #fff;
-  background: linear-gradient(90deg, #2563eb, #22d3ee);
+  background: var(--accent-gradient);
   box-shadow: 0 18px 30px rgba(34,211,238,0.18);
 }
 .btn-primary:hover { filter: brightness(0.98); }
@@ -248,7 +248,7 @@ async function submit() {
 .info {
   border: 1px solid rgba(37,99,235,0.18);
   background: rgba(37,99,235,0.08);
-  color: #1d4ed8;
+  color: var(--accent-strong);
   padding: 10px 12px;
   border-radius: 12px;
   font-weight: 1000;
@@ -266,7 +266,7 @@ async function submit() {
 .link {
   border: none;
   background: transparent;
-  color: #2563eb;
+  color: var(--accent);
   font-weight: 1100;
   cursor: pointer;
   padding: 6px 8px;
@@ -284,7 +284,6 @@ async function submit() {
   .blob { display: none; }
 }
 </style>
-
 
 
 

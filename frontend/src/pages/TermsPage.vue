@@ -1,227 +1,55 @@
 ﻿<template>
-  <AppLayout v-slot="{ toggleSidebar }">
-    <header class="topbar">
-      <div class="title-wrap">
-        <button class="icon-button menu-button" type="button" aria-label="메뉴 열기" @click="toggleSidebar">☰</button>
-        <div>
-          <div class="title-line">
-            <h1>용어집</h1>
-            <span>문서에서 찾은 어려운 표현을 모아 보여줍니다.</span>
-          </div>
-          <div class="meta-line">
-            <strong>총 {{ filteredTerms.length }}개</strong>
-            <span>{{ selectedDocLabel }}</span>
-          </div>
-        </div>
-      </div>
-
-      <div class="top-actions">
-        <button class="button secondary" type="button" :disabled="filteredTerms.length === 0" @click="exportCsv">
-          CSV 내보내기
-        </button>
-        <button class="button primary" type="button" @click="goUpload">문서 업로드</button>
-      </div>
-    </header>
-
-    <main class="content">
-      <section class="filters" aria-label="용어 필터">
-        <select v-model="docFilter" class="field">
-          <option value="all">문서 전체</option>
-          <option v-for="doc in docs" :key="doc.id" :value="doc.id">{{ doc.title }}</option>
-        </select>
-
-        <select v-model="tagFilter" class="field">
-          <option value="all">분류 전체</option>
-          <option value="legal">법·계약</option>
-          <option value="security">보안</option>
-          <option value="finance">재무</option>
-          <option value="policy">정책</option>
-          <option value="general">일반</option>
-        </select>
-
-        <select v-model="sortBy" class="field">
-          <option value="freq">빈도순</option>
-          <option value="alpha">가나다순</option>
-          <option value="new">최근 추가순</option>
-        </select>
-
-        <input v-model.trim="query" class="field search" type="search" placeholder="용어 또는 뜻 검색" />
-        <button class="button secondary" type="button" @click="resetFilters">초기화</button>
-      </section>
-
-      <section class="dictionary-search" aria-label="국어사전 단어 검색">
-        <div>
-          <h2>국어사전 단어 검색</h2>
-          <p>문서에 없는 단어도 바로 찾아볼 수 있습니다.</p>
-        </div>
-        <form class="dictionary-search-form" @submit.prevent="lookupDictionaryQuery">
-          <input
-            v-model.trim="dictionaryQuery"
-            class="field"
-            type="search"
-            placeholder="검색할 단어 입력"
-            autocomplete="off"
-          />
-          <button class="button primary" type="submit" :disabled="dictionarySearchLoading || !dictionaryQuery">
-            {{ dictionarySearchLoading ? "검색 중" : "검색" }}
-          </button>
+  <AppLayout>
+    <main class="doq-terms">
+      <header class="doq-terms-head"><h1>용어집</h1><p>모르는 말은 국어사전에서 바로 찾고, 나만의 용어장에 저장해 두세요.</p></header>
+      <section class="doq-dictionary">
+        <strong>▤ 국어사전에서 찾기</strong>
+        <form @submit.prevent="lookupDictionaryQuery">
+          <label><span>⌕</span><input v-model.trim="dictionaryQuery" placeholder="모르는 단어를 입력하세요 (예: 잔여, 명시)" /></label>
+          <button type="submit" :disabled="dictionarySearchLoading || !dictionaryQuery">{{ dictionarySearchLoading ? "찾는 중" : "찾기" }}</button>
         </form>
-        <div v-if="dictionarySearchError" class="dictionary-error">{{ dictionarySearchError }}</div>
-        <div v-else-if="dictionarySearchResults.length" class="dictionary-list dictionary-search-results">
-          <article v-for="item in dictionarySearchResults" :key="item.word + item.definition" class="dictionary-item">
-            <div class="dictionary-head">
-              <strong>{{ item.word || dictionaryQuery }}</strong>
-              <span v-if="item.pos">{{ item.pos }}</span>
+        <article v-if="dictionarySearchResults[0]" class="doq-dict-result">
+          <div><strong>{{ dictionarySearchResults[0].word || dictionaryQuery }}</strong><button type="button" @click="copyText(dictionarySearchResults[0].definition, '뜻을 복사했습니다.')">뜻 복사</button></div>
+          <p>{{ dictionarySearchResults[0].definition }}</p>
+          <a v-if="dictionarySearchResults[0].link" :href="dictionarySearchResults[0].link" target="_blank" rel="noreferrer">국어사전에서 더 보기 →</a>
+        </article>
+        <div v-if="dictionarySearchError" class="doq-dict-error">{{ dictionarySearchError }}</div>
+      </section>
+      <section class="doq-terms-grid">
+        <div class="doq-doc-terms">
+          <div class="doq-list-head">
+            <div><h2>이 문서의 어려운 용어</h2><span>{{ filteredTerms.length }}개</span></div>
+            <div class="doq-term-tools">
+              <label><span>⌕</span><input v-model.trim="query" placeholder="용어 검색" /></label>
+              <button type="button" @click="cycleTermSort">{{ sortBy === "freq" ? "빈도순" : sortBy === "alpha" ? "가나다순" : "최근순" }}</button>
             </div>
-            <p>{{ item.definition }}</p>
-            <a v-if="item.link" :href="item.link" target="_blank" rel="noreferrer">원문 보기</a>
-          </article>
+          </div>
+          <div v-if="loading" class="doq-term-empty">용어를 불러오는 중입니다.</div>
+          <div v-else-if="pagedTerms.length === 0" class="doq-term-empty">표시할 어려운 용어가 없어요.</div>
+          <div v-else class="doq-term-list">
+            <article v-for="term in pagedTerms" :key="term.id" class="doq-term-row">
+              <div><div><strong>{{ term.term }}</strong><span>·</span><em>{{ tagLabel(term.primaryTag) }}</em></div><p>{{ term.definition }}</p></div>
+              <div class="doq-term-actions">
+                <button type="button" :disabled="pinSaving" @click="savePinnedTerm(term)">{{ term.isPinned ? "✓ 저장됨" : "＋ 저장" }}</button>
+                <button type="button" title="문서에서 보기" @click="openTermDocument(term)">→</button>
+              </div>
+            </article>
+          </div>
         </div>
+        <aside class="doq-my-terms">
+          <div class="doq-my-head"><div><h2>내 용어장</h2><span>{{ pinnedTerms.length }}개</span></div><button type="button" @click="exportCsv">↓ 내보내기</button></div>
+          <div v-if="pinnedTerms.length" class="doq-saved-list">
+            <article v-for="term in pinnedTerms" :key="term.id">
+              <div><strong>{{ term.term }}</strong><button type="button" aria-label="용어장에서 삭제" @click="removePinnedTerm(term)">×</button></div>
+              <p>{{ term.definition }}</p>
+            </article>
+          </div>
+          <div v-else class="doq-saved-empty">아직 저장한 용어가 없어요.<br />왼쪽에서 ‘저장’을 눌러 보세요.</div>
+        </aside>
       </section>
-
-      <div v-if="errorMessage" class="notice error" role="alert">
-        <span>{{ errorMessage }}</span>
-        <button type="button" @click="loadData">다시 시도</button>
-      </div>
-
-      <section class="workspace">
-        <article class="panel list-panel">
-          <div class="panel-header">
-            <h2>용어 목록</h2>
-            <button class="text-button" type="button" @click="pinnedOnly = !pinnedOnly">
-              {{ pinnedOnly ? "전체 보기" : "고정한 용어만" }}
-            </button>
-          </div>
-
-          <div v-if="loading" class="empty-state">용어를 불러오는 중입니다.</div>
-          <div v-else-if="filteredTerms.length === 0" class="empty-state">
-            <template v-if="terms.length === 0">
-              <strong>아직 저장된 용어가 없습니다.</strong>
-              <span>문서를 업로드하고 변환하면 어려운 표현이 이곳에 모입니다.</span>
-              <button class="button primary" type="button" @click="goUpload">문서 업로드</button>
-            </template>
-            <template v-else>
-              <strong>조건에 맞는 용어가 없습니다.</strong>
-              <button class="text-button" type="button" @click="resetFilters">필터 초기화</button>
-            </template>
-          </div>
-
-          <ul v-else class="term-list">
-            <li v-for="term in pagedTerms" :key="term.id">
-              <button
-                class="term-row"
-                :class="{ active: selected?.id === term.id }"
-                type="button"
-                @click="selected = term"
-              >
-                <span class="term-main">
-                  <span class="term-name">{{ term.term }}</span>
-                  <span class="term-context">
-                    <span class="tag">{{ tagLabel(term.primaryTag) }}</span>
-                    <span>{{ term.documentTitle }}</span>
-                  </span>
-                </span>
-                <span class="term-side">
-                  <span>{{ term.frequency }}회</span>
-                  <span v-if="term.isPinned" title="고정됨">★</span>
-                </span>
-              </button>
-            </li>
-          </ul>
-
-          <div v-if="filteredTerms.length > 0" class="pagination">
-            <span>{{ page }} / {{ totalPages }} 페이지</span>
-            <div>
-              <button class="icon-button" type="button" aria-label="이전 페이지" :disabled="page === 1" @click="page--">‹</button>
-              <button class="icon-button" type="button" aria-label="다음 페이지" :disabled="page === totalPages" @click="page++">›</button>
-            </div>
-          </div>
-        </article>
-
-        <article class="panel detail-panel">
-          <div class="panel-header">
-            <h2>용어 설명</h2>
-            <button class="button secondary small" type="button" :disabled="!selected" @click="openDocument">
-              문서에서 보기
-            </button>
-          </div>
-
-          <div v-if="!selected" class="empty-state">
-            <strong>확인할 용어를 선택하세요.</strong>
-            <span>쉬운 뜻과 원문에서 사용된 문장을 함께 보여드립니다.</span>
-          </div>
-
-          <div v-else class="detail-body">
-            <div class="term-heading">
-              <div>
-                <span class="tag">{{ tagLabel(selected.primaryTag) }}</span>
-                <h3>{{ selected.term }}</h3>
-                <p>{{ selected.documentTitle }} · 문서 내 {{ selected.frequency }}회</p>
-              </div>
-              <button
-                class="icon-button pin-button"
-                type="button"
-                :title="selected.isPinned ? '고정 해제' : '용어 고정'"
-                :aria-label="selected.isPinned ? '고정 해제' : '용어 고정'"
-                :disabled="pinSaving"
-                @click="togglePin"
-              >
-                {{ selected.isPinned ? "★" : "☆" }}
-              </button>
-            </div>
-
-            <section class="detail-section">
-              <div class="section-title">
-                <h4>쉬운 뜻</h4>
-                <button class="text-button" type="button" @click="copyText(selected.definition, '뜻을 복사했습니다.')">복사</button>
-              </div>
-              <p class="definition">{{ selected.definition }}</p>
-            </section>
-
-            <section class="detail-section">
-              <div class="section-title">
-                <h4>국어사전</h4>
-                <button
-                  class="text-button"
-                  type="button"
-                  :disabled="dictionaryLoading"
-                  @click="lookupDictionary"
-                >
-                  {{ dictionaryLoading ? "조회 중" : "사전 뜻 조회" }}
-                </button>
-              </div>
-              <div v-if="dictionaryError" class="dictionary-error">{{ dictionaryError }}</div>
-              <div v-else-if="dictionaryResults.length" class="dictionary-list">
-                <article v-for="item in dictionaryResults" :key="item.word + item.definition" class="dictionary-item">
-                  <div class="dictionary-head">
-                    <strong>{{ item.word || selected.term }}</strong>
-                    <span v-if="item.pos">{{ item.pos }}</span>
-                  </div>
-                  <p>{{ item.definition }}</p>
-                  <a v-if="item.link" :href="item.link" target="_blank" rel="noreferrer">원문 보기</a>
-                </article>
-              </div>
-              <p v-else class="muted">선택한 용어의 국어사전 뜻을 조회할 수 있습니다.</p>
-            </section>
-
-            <section class="detail-section">
-              <div class="section-title"><h4>문서에서 사용된 문장</h4></div>
-              <ol v-if="selected.evidence.length" class="evidence-list">
-                <li v-for="sentence in selected.evidence" :key="sentence">{{ sentence }}</li>
-              </ol>
-              <p v-else class="muted">원문에서 일치하는 문장을 찾지 못했습니다.</p>
-            </section>
-
-            <div class="detail-actions">
-              <button class="button primary" type="button" @click="askAboutTerm">Q&A에서 질문</button>
-              <button class="button secondary" type="button" @click="copyText(selected.term, '용어를 복사했습니다.')">용어 복사</button>
-            </div>
-          </div>
-        </article>
-      </section>
+      <div v-if="toast" class="toast" role="status">{{ toast }}</div>
     </main>
 
-    <div v-if="toast" class="toast" role="status">{{ toast }}</div>
   </AppLayout>
 </template>
 
@@ -273,9 +101,6 @@ const docFilter = ref("all");
 const tagFilter = ref<"all" | Tag>("all");
 const sortBy = ref<SortOption>("freq");
 const pinnedOnly = ref(false);
-const dictionaryLoading = ref(false);
-const dictionaryError = ref("");
-const dictionaryResults = ref<DictionaryItem[]>([]);
 const dictionaryQuery = ref("");
 const dictionarySearchLoading = ref(false);
 const dictionarySearchError = ref("");
@@ -347,10 +172,7 @@ const filteredTerms = computed(() => {
 
 const totalPages = computed(() => Math.max(1, Math.ceil(filteredTerms.value.length / perPage)));
 const pagedTerms = computed(() => filteredTerms.value.slice((page.value - 1) * perPage, page.value * perPage));
-const selectedDocLabel = computed(() => {
-  if (docFilter.value === "all") return "모든 문서";
-  return docs.value.find((doc) => doc.id === docFilter.value)?.title || "선택 문서";
-});
+const pinnedTerms = computed(() => terms.value.filter((term) => term.isPinned));
 
 watch([query, docFilter, tagFilter, sortBy, pinnedOnly], () => {
   page.value = 1;
@@ -359,26 +181,12 @@ watch([query, docFilter, tagFilter, sortBy, pinnedOnly], () => {
   }
 });
 
-watch(selected, () => {
-  dictionaryError.value = "";
-  dictionaryResults.value = [];
-});
-
 watch(totalPages, (value) => {
   page.value = Math.min(page.value, value);
 });
 
 function tagLabel(tag: Tag) {
   return { legal: "법·계약", security: "보안", finance: "재무", policy: "정책", general: "일반" }[tag];
-}
-
-function resetFilters() {
-  query.value = "";
-  docFilter.value = "all";
-  tagFilter.value = "all";
-  sortBy.value = "freq";
-  pinnedOnly.value = false;
-  selected.value = null;
 }
 
 function showToast(message: string) {
@@ -405,23 +213,24 @@ async function togglePin() {
   }
 }
 
-async function lookupDictionary() {
-  if (!selected.value || dictionaryLoading.value) return;
-  dictionaryLoading.value = true;
-  dictionaryError.value = "";
-  dictionaryResults.value = [];
-  try {
-    const response = await documentService.searchDictionary(selected.value.term, 5);
-    dictionaryResults.value = response.data.items || [];
-    if (!dictionaryResults.value.length) {
-      dictionaryError.value = "국어사전 결과가 없습니다. API 키 활성화 상태를 확인해 주세요.";
-    }
-  } catch (error: any) {
-    console.error("Failed to lookup dictionary", error);
-    dictionaryError.value = error.response?.data?.detail || "국어사전 조회에 실패했습니다.";
-  } finally {
-    dictionaryLoading.value = false;
-  }
+async function savePinnedTerm(term: TermItem) {
+  if (term.isPinned) return;
+  selected.value = term;
+  await togglePin();
+}
+
+async function removePinnedTerm(term: TermItem) {
+  selected.value = term;
+  await togglePin();
+}
+
+function openTermDocument(term: TermItem) {
+  localStorage.setItem("last_document_id", term.documentId);
+  router.push({ name: "documentView", params: { id: term.documentId } });
+}
+
+function cycleTermSort() {
+  sortBy.value = sortBy.value === "freq" ? "alpha" : sortBy.value === "alpha" ? "new" : "freq";
 }
 
 async function lookupDictionaryQuery() {
@@ -452,22 +261,6 @@ async function copyText(value: string, successMessage: string) {
   }
 }
 
-function openDocument() {
-  if (!selected.value) return;
-  router.push({ name: "documentView", params: { id: selected.value.documentId } });
-}
-
-function askAboutTerm() {
-  if (!selected.value) return;
-  router.push({
-    name: "qa",
-    query: {
-      documentId: selected.value.documentId,
-      question: `이 문서에서 '${selected.value.term}'은 무슨 뜻이야?`,
-    },
-  });
-}
-
 function exportCsv() {
   const quote = (value: unknown) => `"${String(value ?? "").replace(/"/g, '""')}"`;
   const rows = filteredTerms.value.map((term) => [
@@ -489,112 +282,27 @@ function exportCsv() {
   URL.revokeObjectURL(url);
 }
 
-function goUpload() {
-  router.push({ name: "upload" });
-}
-
 onMounted(loadData);
 </script>
 
+
 <style scoped>
-.topbar {
-  min-height: 76px;
-  padding: 10px 24px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 20px;
-  background: var(--topbar-bg);
-  border-bottom: 1px solid var(--line);
-}
-.title-wrap, .title-line, .meta-line, .top-actions, .panel-header, .section-title, .detail-actions, .pagination, .pagination div { display: flex; align-items: center; }
-.title-wrap { gap: 12px; min-width: 0; }
-.title-line { gap: 10px; flex-wrap: wrap; }
-.title-line h1 { margin: 0; font-size: 18px; color: var(--ink); }
-.title-line span, .meta-line span { color: var(--muted); }
-.meta-line { gap: 10px; margin-top: 3px; font-size: 12px; }
-.meta-line strong { color: var(--ink); }
-.top-actions { gap: 10px; flex-wrap: wrap; }
-.menu-button { display: none; }
-.content { width: 100%; max-width: 1500px; margin: 0 auto; padding: 20px 18px 32px; display: grid; gap: 16px; }
-.filters { display: grid; grid-template-columns: 190px 150px 150px minmax(240px, 1fr) auto; gap: 10px; }
-.field, .button, .icon-button { min-height: 44px; border: 1px solid var(--field-border); background: var(--field-bg); color: var(--field-text); font: inherit; }
-.field { width: 100%; padding: 0 12px; border-radius: 8px; outline: none; }
-.field:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
-.button { border-radius: 8px; padding: 0 15px; font-weight: 800; cursor: pointer; white-space: nowrap; }
-.button.primary { color: #fff; background: var(--accent); border-color: var(--accent); }
-.button.secondary { background: transparent; color: var(--ink); }
-.button.small { min-height: 38px; padding: 0 12px; }
-.button:disabled, .icon-button:disabled { opacity: .45; cursor: not-allowed; }
-.icon-button { width: 44px; padding: 0; border-radius: 8px; display: inline-grid; place-items: center; cursor: pointer; font-size: 20px; }
-.notice { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 12px 14px; border: 1px solid #fecaca; border-radius: 8px; color: #991b1b; background: #fef2f2; }
-.notice button, .text-button { border: 0; padding: 5px; background: transparent; color: var(--accent); font: inherit; font-weight: 800; cursor: pointer; }
-.dictionary-search { padding: 16px; border: 1px solid var(--line); border-radius: 8px; background: var(--card); display: grid; gap: 12px; }
-.dictionary-search h2 { margin: 0; color: var(--ink); font-size: 17px; }
-.dictionary-search p { margin: 4px 0 0; color: var(--muted); font-size: 13px; }
-.dictionary-search-form { display: grid; grid-template-columns: minmax(220px, 1fr) auto; gap: 10px; }
-.dictionary-search-results { margin-top: 2px; }
-.workspace { min-height: 620px; display: grid; grid-template-columns: minmax(360px, .85fr) minmax(440px, 1.15fr); gap: 16px; }
-.panel { min-width: 0; padding: 18px; display: flex; flex-direction: column; background: var(--card); border: 1px solid var(--line); border-radius: 8px; }
-.panel-header { min-height: 44px; justify-content: space-between; gap: 12px; padding-bottom: 12px; border-bottom: 1px solid var(--line); }
-.panel-header h2 { margin: 0; font-size: 18px; color: var(--ink); }
-.empty-state { flex: 1; min-height: 300px; display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 12px; text-align: center; color: var(--muted); }
-.empty-state strong { color: var(--ink); font-size: 17px; }
-.term-list { list-style: none; margin: 12px 0 0; padding: 0; flex: 1; min-height: 0; overflow: auto; }
-.term-list li + li { border-top: 1px solid var(--line); }
-.term-row { width: 100%; min-height: 76px; padding: 12px; border: 0; border-left: 3px solid transparent; display: flex; align-items: center; justify-content: space-between; gap: 14px; text-align: left; color: var(--ink); background: transparent; cursor: pointer; }
-.term-row:hover, .term-row.active { background: var(--accent-soft); border-left-color: var(--accent); }
-.term-main { min-width: 0; display: grid; gap: 7px; }
-.term-name { font-weight: 900; font-size: 16px; word-break: break-word; }
-.term-context { min-width: 0; display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 12px; }
-.term-context > span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.tag { width: max-content; padding: 3px 7px; border: 1px solid var(--accent-border); border-radius: 6px; color: var(--accent); background: var(--accent-soft); font-size: 12px; font-weight: 800; }
-.term-side { flex: 0 0 auto; display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 12px; }
-.pagination { justify-content: space-between; gap: 12px; padding-top: 12px; border-top: 1px solid var(--line); color: var(--muted); font-size: 12px; }
-.pagination div { gap: 6px; }
-.detail-body { padding-top: 18px; min-height: 0; overflow: auto; }
-.term-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 18px; }
-.term-heading h3 { margin: 12px 0 4px; color: var(--ink); font-size: 27px; word-break: break-word; }
-.term-heading p { margin: 0; color: var(--muted); }
-.pin-button { flex: 0 0 auto; }
-.detail-section { padding: 20px 0; border-top: 1px solid var(--line); }
-.detail-section:first-of-type { margin-top: 22px; }
-.section-title { justify-content: space-between; gap: 12px; }
-.section-title h4 { margin: 0 0 10px; color: var(--ink); font-size: 15px; }
-.definition { margin: 0; color: var(--ink); line-height: 1.8; }
-.dictionary-list { display: grid; gap: 10px; }
-.dictionary-item { padding: 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--field-bg); }
-.dictionary-head { display: flex; align-items: center; gap: 8px; color: var(--ink); }
-.dictionary-head span { color: var(--muted); font-size: 12px; font-weight: 800; }
-.dictionary-item p { margin: 8px 0 0; color: var(--ink); line-height: 1.7; }
-.dictionary-item a { display: inline-block; margin-top: 8px; color: var(--accent); font-weight: 800; text-decoration: none; }
-.dictionary-error { color: #991b1b; font-weight: 800; }
-:global([data-theme="dark"]) .dictionary-error { color: #fda4af; }
-.evidence-list { margin: 0; padding-left: 24px; display: grid; gap: 12px; color: var(--ink); line-height: 1.7; }
-.evidence-list li::marker { color: var(--accent); font-weight: 800; }
-.muted { color: var(--muted); }
-.detail-actions { gap: 10px; flex-wrap: wrap; padding-top: 4px; }
-.toast { position: fixed; right: 24px; bottom: 24px; z-index: 50; padding: 12px 16px; border-radius: 8px; color: #fff; background: #111827; box-shadow: 0 8px 24px rgba(0,0,0,.18); }
-:global([data-theme="dark"]) .notice.error { color: #fecaca; background: #451a1a; border-color: #7f1d1d; }
-
-@media (max-width: 1040px) {
-  .filters { grid-template-columns: repeat(3, 1fr); }
-  .search { grid-column: span 2; }
-  .workspace { grid-template-columns: 1fr; }
-  .panel { min-height: 480px; }
-}
-@media (max-width: 720px) {
-  .topbar { padding: 14px 16px; align-items: flex-start; flex-wrap: wrap; }
-  .menu-button { display: inline-grid; }
-  .title-line span { display: none; }
-  .top-actions { width: 100%; justify-content: flex-end; }
-  .content { padding: 14px; }
-  .filters { grid-template-columns: 1fr; }
-  .dictionary-search-form { grid-template-columns: 1fr; }
-  .search { grid-column: auto; }
-  .workspace { min-height: 0; }
-  .panel { min-height: 420px; padding: 14px; }
-}
+.doq-terms { width: min(1000px, 100%); margin: 0 auto; padding: 34px 40px 56px; }
+.doq-terms-head h1 { margin: 0 0 5px; font-size: 24px; letter-spacing: -.01em; }.doq-terms-head p { margin: 0 0 22px; color: var(--muted); font-size: 14px; }
+.doq-dictionary { margin-bottom: 24px; padding: 18px 20px; border: 1px solid var(--line); border-radius: 18px; background: var(--surface); }.doq-dictionary > strong { display: block; margin-bottom: 12px; font-size: 13px; }
+.doq-dictionary form { display: flex; gap: 8px; }.doq-dictionary form label { height: 46px; padding: 0 14px; display: flex; align-items: center; gap: 9px; flex: 1; border: 1px solid var(--line); border-radius: 12px; background: var(--soft); }.doq-dictionary form label span { color: var(--muted); font-size: 20px; }.doq-dictionary input { min-width: 0; flex: 1; border: 0; outline: 0; color: var(--ink); background: transparent; font-size: 14px; }
+.doq-dictionary form > button { height: 46px; padding: 0 20px; border: 0; border-radius: 12px; color: #fff; background: var(--accent-gradient); font-size: 14px; font-weight: 600; cursor: pointer; }.doq-dictionary form > button:disabled { opacity: .5; }
+.doq-dict-result { margin-top: 14px; padding: 16px 18px; border: 1px solid var(--line); border-radius: 14px; background: var(--soft); }.doq-dict-result > div { display: flex; align-items: center; justify-content: space-between; }.doq-dict-result > div > strong { font-size: 15px; }.doq-dict-result button { height: 30px; padding: 0 12px; border: 0; border-radius: 9px; color: #fff; background: var(--accent-gradient); font-size: 12px; font-weight: 600; cursor: pointer; }.doq-dict-result p { margin: 7px 0 9px; color: var(--sub); font-size: 14px; line-height: 1.7; }.doq-dict-result a { color: var(--accent); font-size: 12px; font-weight: 600; }
+.doq-dict-error { margin-top: 14px; padding: 14px 16px; border: 1px solid #f6e6c8; border-radius: 14px; color: #8a6a2a; background: #fff7ea; font-size: 13px; }
+.doq-terms-grid { display: grid; grid-template-columns: 1.15fr .85fr; gap: 18px; align-items: start; }
+.doq-list-head { margin-bottom: 12px; display: flex; align-items: center; justify-content: space-between; gap: 9px; }.doq-list-head > div:first-child { display: flex; align-items: baseline; gap: 9px; }.doq-list-head h2, .doq-my-head h2 { margin: 0; font-size: 16px; }.doq-list-head span, .doq-my-head span { color: var(--muted); font-size: 12.5px; }
+.doq-term-tools { display: flex; gap: 6px; }.doq-term-tools label { width: 150px; height: 34px; padding: 0 11px; display: flex; align-items: center; gap: 7px; border: 1px solid var(--line); border-radius: 10px; background: var(--soft); }.doq-term-tools label span { font-size: 16px; }.doq-term-tools input { min-width: 0; flex: 1; border: 0; outline: 0; color: var(--ink); background: transparent; font-size: 12.5px; }.doq-term-tools > button { height: 34px; padding: 0 11px; border: 1px solid var(--line); border-radius: 10px; color: var(--sub); background: var(--surface); font-size: 12px; font-weight: 600; cursor: pointer; }
+.doq-term-list { display: grid; gap: 12px; }.doq-term-row { padding: 16px 18px; display: flex; align-items: center; gap: 14px; border: 1px solid var(--line); border-radius: 18px; background: var(--surface); }.doq-term-row > div:first-child { min-width: 0; flex: 1; }.doq-term-row > div:first-child > div { display: flex; align-items: center; gap: 9px; }.doq-term-row strong { font-size: 15.5px; }.doq-term-row em { color: var(--accent); font-size: 12.5px; font-style: normal; font-weight: 600; }.doq-term-row p { margin: 5px 0 0; color: var(--muted); font-size: 13px; line-height: 1.6; }
+.doq-term-actions { display: flex; gap: 7px; flex: none; }.doq-term-actions button { height: 34px; padding: 0 13px; border: 1px solid var(--line); border-radius: 9px; color: var(--accent-strong); background: var(--surface); font-size: 12.5px; font-weight: 600; cursor: pointer; }.doq-term-actions button:last-child { width: 34px; padding: 0; color: var(--muted); }
+.doq-term-empty { padding: 26px; border: 1.5px dashed var(--line); border-radius: 18px; color: var(--muted); background: var(--soft); text-align: center; font-size: 13.5px; }
+.doq-my-terms { position: sticky; top: 20px; padding: 18px 18px 8px; border: 1px solid var(--line); border-radius: 18px; background: var(--surface); }.doq-my-head { margin-bottom: 12px; display: flex; align-items: center; justify-content: space-between; }.doq-my-head > div { display: flex; align-items: baseline; gap: 8px; }.doq-my-head h2 { font-size: 15px; }.doq-my-head > button { height: 30px; padding: 0 10px; border: 1px solid var(--line); border-radius: 9px; color: var(--sub); background: var(--surface); font-size: 11.5px; font-weight: 600; cursor: pointer; }
+.doq-saved-list { max-height: 440px; padding: 2px 4px 12px 0; display: flex; flex-direction: column; gap: 8px; overflow-y: auto; }.doq-saved-list article { padding: 12px 13px; border: 1px solid var(--line); border-radius: 13px; background: var(--soft); }.doq-saved-list article > div { display: flex; align-items: center; justify-content: space-between; gap: 8px; }.doq-saved-list strong { font-size: 13.5px; }.doq-saved-list button { width: 24px; height: 24px; border: 0; border-radius: 7px; color: var(--muted); background: var(--surface); cursor: pointer; }.doq-saved-list p { margin: 5px 0 0; color: var(--muted); font-size: 12.5px; line-height: 1.6; }
+.doq-saved-empty { margin-bottom: 10px; padding: 22px 16px; border: 1.5px dashed var(--line); border-radius: 13px; color: var(--muted); background: var(--soft); text-align: center; font-size: 12.5px; }
+@media (max-width: 850px) { .doq-terms-grid { grid-template-columns: 1fr; }.doq-my-terms { position: static; } }
+@media (max-width: 620px) { .doq-terms { padding: 24px 18px 40px; }.doq-dictionary form { align-items: stretch; flex-direction: column; }.doq-list-head { align-items: stretch; flex-direction: column; }.doq-term-tools label { flex: 1; }.doq-term-row { align-items: flex-start; flex-direction: column; }.doq-term-actions { width: 100%; }.doq-term-actions button:first-child { flex: 1; } }
 </style>
-
-

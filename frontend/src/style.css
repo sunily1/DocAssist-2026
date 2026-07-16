@@ -1,90 +1,105 @@
-/* 인수인계용: 전역 테마/색상/폰트/크기 정의 */
+@import url("https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap");
+
 :root {
   color-scheme: light;
-  --primary-color: #2563eb;
-  --secondary-color: #0891b2;
-  --success-color: #10b981;
-  --warning-color: #f59e0b;
-  --danger-color: #ef4444;
-  --bg-color: #f5f7fb;
-  --card-bg: #ffffff;
-  --text-primary: #111827;
-  --text-secondary: #667085;
-  --border-color: #dfe4ee;
-  --shadow: 0 12px 30px rgb(15 23 42 / 0.07);
-  --shadow-lg: 0 20px 50px rgb(15 23 42 / 0.12);
-
-  --ink: #111827;
-  --bg: #f5f7fb;
-  --line: #dfe4ee;
+  --base-font-size: 16px;
+  --bg: #f3f2f8;
+  --bg-color: #f3f2f8;
   --card: #ffffff;
+  --card-bg: #ffffff;
   --card-solid: #ffffff;
-  --muted: #667085;
-  --field-bg: #ffffff;
-  --field-text: #111827;
-  --field-border: #d7deea;
+  --surface: #ffffff;
+  --soft: #f6f5fb;
+  --ink: #191527;
+  --text-primary: #191527;
+  --sub: #2c2937;
+  --muted: #7c7a8c;
+  --text-secondary: #7c7a8c;
+  --line: #ecebf2;
+  --border-color: #ecebf2;
+  --field-bg: #faf9fd;
+  --field-text: #191527;
+  --field-border: #e3e0ec;
   --button-bg: #ffffff;
-  --button-text: #111827;
-  --button-hover: #eef4ff;
-  --accent: #2563eb;
-  --accent-2: #0891b2;
+  --button-text: #2c2937;
+  --button-hover: #f1effa;
+  --accent: #6a4dff;
+  --primary-color: #6a4dff;
+  --accent-strong: #5638e0;
+  --accent-2: #4e6bff;
+  --secondary-color: #4e6bff;
+  --accent-gradient: linear-gradient(135deg, #6a4dff, #4e6bff);
   --accent-contrast: #ffffff;
-  --accent-soft: rgb(37 99 235 / 0.1);
-  --accent-border: rgb(37 99 235 / 0.22);
-
+  --accent-soft: rgb(106 77 255 / 0.1);
+  --accent-border: rgb(106 77 255 / 0.22);
+  --success-color: #12a58a;
+  --warning-color: #e0952a;
+  --danger-color: #dc4b67;
   --sidebar-bg: #ffffff;
-  --topbar-bg: #ffffff;
+  --sidebar-fg: #6b6879;
+  --sidebar-muted: #a9a7b6;
+  --topbar-bg: rgb(255 255 255 / .92);
+  --shadow: 0 10px 30px rgb(30 20 70 / .06);
+  --shadow-lg: 0 22px 55px rgb(30 20 70 / .12);
 }
 
 [data-theme="dark"] {
   color-scheme: dark;
-  --primary-color: #5b8cff;
-  --secondary-color: #21c7b7;
-  --success-color: #34d399;
-  --warning-color: #fbbf24;
-  --danger-color: #fb7185;
-  --bg-color: #0d1017;
-  --card-bg: #171c24;
-  --text-primary: #f6f8fb;
-  --text-secondary: #b5bfce;
-  --border-color: #313a49;
-  --shadow: 0 18px 44px rgb(0 0 0 / 0.32);
-  --shadow-lg: 0 24px 60px rgb(0 0 0 / 0.42);
-
-  --ink: #f6f8fb;
-  --bg: #0d1017;
-  --line: #313a49;
-  --card: #171c24;
-  --card-solid: #202735;
-  --muted: #aab4c3;
-  --field-bg: #111722;
-  --field-text: #f6f8fb;
-  --field-border: #394354;
-  --button-bg: #202735;
-  --button-text: #f6f8fb;
-  --button-hover: #293244;
-  --accent: #5b8cff;
-  --accent-2: #21c7b7;
-  --accent-contrast: #ffffff;
-  --accent-soft: rgb(91 140 255 / 0.16);
-  --accent-border: rgb(91 140 255 / 0.34);
-
-  --sidebar-bg: #10151d;
-  --topbar-bg: #131922;
+  --bg: #151420;
+  --bg-color: #151420;
+  --card: #201e29;
+  --card-bg: #201e29;
+  --card-solid: #272430;
+  --surface: #201e29;
+  --soft: #272430;
+  --ink: #f4f2f8;
+  --text-primary: #f4f2f8;
+  --sub: #d7d4e2;
+  --muted: #a9a4b9;
+  --text-secondary: #a9a4b9;
+  --line: #343140;
+  --border-color: #343140;
+  --field-bg: #26232f;
+  --field-text: #f4f2f8;
+  --field-border: #403b4c;
+  --button-bg: #292633;
+  --button-text: #f4f2f8;
+  --button-hover: #302c3b;
+  --accent: #8c74ff;
+  --primary-color: #8c74ff;
+  --accent-strong: #b8aaff;
+  --accent-2: #6d84ff;
+  --secondary-color: #6d84ff;
+  --accent-gradient: linear-gradient(135deg, #7c5cff, #576fff);
+  --accent-soft: rgb(140 116 255 / .16);
+  --accent-border: rgb(140 116 255 / .34);
+  --success-color: #37c8aa;
+  --warning-color: #f0b85a;
+  --danger-color: #ff7890;
+  --sidebar-bg: #17151f;
+  --sidebar-fg: #aaa6b8;
+  --sidebar-muted: #777283;
+  --topbar-bg: rgb(23 21 31 / .92);
+  --shadow: 0 14px 34px rgb(0 0 0 / .2);
+  --shadow-lg: 0 24px 60px rgb(0 0 0 / .34);
 }
 
-/* Font Size Scaling */
-:root { --base-font-size: 16px; }
 :root[data-size="sm"] { --base-font-size: 14px; }
 :root[data-size="md"] { --base-font-size: 16px; }
 :root[data-size="lg"] { --base-font-size: 18px; }
 
+* { box-sizing: border-box; }
+html, body { margin: 0; min-height: 100%; }
 body {
-  margin: 0;
-  background-color: var(--bg);
+  background: var(--bg);
   color: var(--ink);
+  font-family: "IBM Plex Sans KR", system-ui, sans-serif;
   font-size: var(--base-font-size);
+  -webkit-font-smoothing: antialiased;
 }
+button, input, select, textarea { font: inherit; letter-spacing: 0; }
+button { color: inherit; }
+::selection { background: rgb(124 92 255 / .22); }
 
 body.font-size-sm { --app-title-size: 15px; --app-body-size: 13px; --app-control-size: 13px; --app-small-size: 11px; }
 body.font-size-md { --app-title-size: 16px; --app-body-size: 14px; --app-control-size: 14px; --app-small-size: 12px; }
@@ -96,63 +111,75 @@ body.font-size-custom {
   --app-small-size: var(--custom-small-size, 14px);
 }
 
-body[class*="font-size-"] :where(.tb-title-strong, .card-head h2, .qa-title, .term-title, .block-title, .detail-title .big, .name, .title, h2) {
-  font-size: var(--app-title-size) !important;
-}
-body[class*="font-size-"] :where(.text p, .block-text, .evid-text, .ev-body, .pin-text, .empty, .help, .foot-muted, .email, .meta-line, .form, .field) {
-  font-size: var(--app-body-size) !important;
-}
-body[class*="font-size-"] :where(button, input, select, textarea, .btn, .input, .select, .doc-select, .seg-btn) {
-  font-size: var(--app-control-size) !important;
-}
-body[class*="font-size-"] :where(.muted, .small, .tb-sub, .label, .badge, .tag, .who, .pill, .link, .cite-title, .cite-chip) {
-  font-size: var(--app-small-size) !important;
-}
+body[class*="font-size-"] :where(.tb-title-strong, .card-head h2, .qa-title, .term-title, .block-title, .detail-title .big, .name, .title, h2) { font-size: var(--app-title-size) !important; }
+body[class*="font-size-"] :where(.text p, .block-text, .evid-text, .ev-body, .pin-text, .empty, .help, .foot-muted, .email, .meta-line, .form, .field) { font-size: var(--app-body-size) !important; }
+body[class*="font-size-"] :where(button, input, select, textarea, .btn, .input, .select, .doc-select, .seg-btn) { font-size: var(--app-control-size) !important; }
+body[class*="font-size-"] :where(.muted, .small, .tb-sub, .label, .badge, .tag, .who, .pill, .link, .cite-title, .cite-chip) { font-size: var(--app-small-size) !important; }
 
-button,
-input,
-select,
-textarea {
-  font-family: inherit;
-  letter-spacing: 0;
-}
-
-/* 기존 화면 구성을 유지하면서 공통 요소만 정돈합니다. */
 #app .app .topbar {
-  padding-left: 24px;
-  padding-right: 24px;
-  border-bottom-color: var(--line);
-  box-shadow: 0 1px 0 rgb(15 23 42 / 0.02);
+  min-height: 72px;
+  padding: 14px 34px;
+  border-bottom: 1px solid var(--line);
+  background: var(--topbar-bg);
+  backdrop-filter: blur(16px);
 }
 
-#app .app :where(.card, .panel, .term-panel, .state-card) {
-  border-radius: 14px;
-  border-color: var(--line);
-  box-shadow: 0 5px 18px rgb(15 23 42 / 0.035);
-}
+#app .app :where(.content, .container) { width: 100%; max-width: 1180px; margin: 0 auto; padding: 28px 34px 52px; }
+#app .app :where(.tb-title-strong, .topbar h1) { color: var(--ink); font-weight: 700; }
+#app .app .tb-sub { color: var(--muted); font-weight: 400; }
 
-#app .app :where(.btn, .button, .icon-btn, .icon-button, .seg-btn) {
-  border-radius: 10px;
-  min-height: 40px;
+#app .app :where(.card, .panel, .term-panel, .state-card, .side-card, .document-preview) {
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  color: var(--ink);
+  background: var(--card);
   box-shadow: none;
 }
 
-#app .app :where(.input, .select, .field, .textarea, .doc-select, .tb-search) {
-  border-radius: 10px;
+#app .app :where(.btn, .button, .icon-btn, .icon-button, .seg-btn, .small-btn) {
+  min-height: 40px;
+  border-radius: 11px;
   border-color: var(--field-border);
+  box-shadow: none;
+  font-weight: 600;
 }
 
-#app .app :where(.input, .select, .textarea, .doc-select, .tb-search):focus {
+#app .app :where(.btn-primary, .primary) {
+  border-color: transparent;
+  color: #fff;
+  background: var(--accent-gradient);
+  box-shadow: 0 7px 18px rgb(106 77 255 / .22);
+}
+
+#app .app :where(.btn-primary, .primary):hover { filter: brightness(1.04); transform: translateY(-1px); }
+#app .app :where(.input, .select, .field, .textarea, .doc-select, .tb-search, .search-input) {
+  border-radius: 12px;
+  border-color: var(--field-border);
+  color: var(--field-text);
+  background: var(--field-bg);
+}
+#app .app :where(.input, .select, .textarea, .doc-select, .tb-search, .search-input):focus {
   outline: none;
   border-color: var(--accent);
   box-shadow: 0 0 0 3px var(--accent-soft);
 }
-
-#app .app :where(.empty, .empty-state) {
-  border-radius: 10px;
+#app .app :where(.empty, .empty-state, .viewer-state) {
+  border-radius: 13px;
   border-color: var(--line);
+  color: var(--muted);
+  background: var(--soft);
 }
 
-[data-theme="dark"] #app .app :where(.card, .panel, .term-panel, .state-card) {
-  box-shadow: 0 8px 22px rgb(0 0 0 / 0.16);
+#app .app :where(.badge, .pill, .chip, .tag) { border-radius: 999px; }
+#app .app a, #app .app .link, #app .app .inline { color: var(--accent); }
+
+* { scrollbar-width: thin; scrollbar-color: #d8d5e6 transparent; }
+*::-webkit-scrollbar { width: 9px; height: 9px; }
+*::-webkit-scrollbar-thumb { border: 2px solid transparent; border-radius: 9px; background: #d8d5e6; background-clip: content-box; }
+[data-theme="dark"] * { scrollbar-color: #4a4555 transparent; }
+[data-theme="dark"] *::-webkit-scrollbar-thumb { background: #4a4555; background-clip: content-box; }
+
+@media (max-width: 820px) {
+  #app .app .topbar { min-height: 64px; padding: 12px 16px; }
+  #app .app :where(.content, .container) { padding: 20px 16px 38px; }
 }

@@ -188,12 +188,12 @@ async function onSubmit() {
 
 <style scoped>
 :root {
-  --b1: #1d4ed8;
-  --b2: #0ea5e9;
+  --b1: var(--accent);
+  --b2: var(--accent-2);
   --ink: #111827;
   --muted: #6b7280;
   --line: #e5e7eb;
-  --ring: rgba(29, 78, 216, 0.18);
+  --ring: var(--accent-soft);
 }
 
 .page {
@@ -339,7 +339,7 @@ async function onSubmit() {
   border-radius: 8px;
   font-size: 12px;
 }
-.link:hover { background: rgba(29, 78, 216, 0.08); }
+.link:hover { background: var(--accent-soft); }
 .link.inline { padding: 0 4px; }
 .link.strong { padding: 0 6px; }
 
