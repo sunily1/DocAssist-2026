@@ -51,6 +51,23 @@ class RAGService:
         query_tokens = self._tokens(query)
         return bool(query_tokens and query_tokens & self._tokens(text))
 
+    def _is_summary_request(self, query: str) -> bool:
+        """Detect requests that target the selected document as a whole."""
+        compact = re.sub(r"\s+", "", (query or "").lower())
+        return any(
+            marker in compact
+            for marker in (
+                "요약",
+                "핵심",
+                "주요내용",
+                "전체내용",
+                "무슨내용",
+                "어떤내용",
+                "내용정리",
+                "간단히정리",
+            )
+        )
+
     def _make_citation(self, idx: int, section: str, score: int, quote: str) -> dict:
         return {
             "citeId": f"doc-{idx}",
@@ -119,8 +136,15 @@ class RAGService:
             return "", []
 
         candidates: list[tuple[str, str, int]] = []
+        summary_request = self._is_summary_request(query)
         if analysis.summary:
-            candidates.append(("요약", analysis.summary.strip(), self._score_text(query, analysis.summary)))
+            candidates.append(
+                (
+                    "요약",
+                    analysis.summary.strip(),
+                    100 if summary_request else self._score_text(query, analysis.summary),
+                )
+            )
 
         for idx, paragraph in enumerate(analysis.paragraphs or [], start=1):
             pieces = [
@@ -135,9 +159,10 @@ class RAGService:
             ]
             text = " ".join(str(piece).strip() for piece in pieces if piece and str(piece).strip())
             if text:
-                candidates.append((f"문단 {idx}", text, self._score_text(query, text)))
+                score = max(70 - idx, 50) if summary_request else self._score_text(query, text)
+                candidates.append((f"문단 {idx}", text, score))
 
-        candidates = [candidate for candidate in candidates if candidate[2] > 45]
+        candidates = [candidate for candidate in candidates if summary_request or candidate[2] > 45]
         candidates.sort(key=lambda item: item[2], reverse=True)
         for idx, (section, text, score) in enumerate(candidates[:top_k], start=1):
             quote = text[:700]

@@ -49,6 +49,7 @@ frontend/test-results/
 
 # Runtime uploads
 backend/uploads/
+frontend/public/pdfjs/
 
 # Imported dependencies and OS archive metadata
 frontend/node_modules*/

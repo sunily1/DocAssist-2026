@@ -1,7 +1,9 @@
 import pytest
 import asyncio
+import os
 from typing import AsyncGenerator
 from httpx import AsyncClient, ASGITransport
+from sqlalchemy.engine import make_url
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy import text
@@ -17,8 +19,20 @@ from app.models import (
 from app.main import app
 from app.core.config import settings
 
-# Test DB URL
-TEST_DATABASE_URL = settings.DATABASE_URL
+def _test_database_url() -> str:
+    configured = os.getenv("TEST_DATABASE_URL", "").strip()
+    if configured:
+        return configured
+
+    runtime_url = make_url(settings.DATABASE_URL)
+    database = runtime_url.database or "docassist"
+    return runtime_url.set(database=f"{database}_test").render_as_string(hide_password=False)
+
+
+# Integration tests must never drop tables from the runtime database.
+TEST_DATABASE_URL = _test_database_url()
+if make_url(TEST_DATABASE_URL) == make_url(settings.DATABASE_URL):
+    raise RuntimeError("TEST_DATABASE_URL must be different from DATABASE_URL")
 
 @pytest.fixture(scope="function")
 async def db_engine():

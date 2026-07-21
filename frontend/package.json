@@ -3,7 +3,10 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
+    "prepare:pdfjs": "node scripts/copy-pdfjs-assets.mjs",
+    "predev": "npm run prepare:pdfjs",
     "dev": "vite",
+    "prebuild": "npm run prepare:pdfjs",
     "build": "vue-tsc && vite build",
     "preview": "vite preview"
   },

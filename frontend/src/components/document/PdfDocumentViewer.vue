@@ -38,6 +38,10 @@ import workerUrl from "pdfjs-dist/build/pdf.worker.min.mjs?url";
 
 GlobalWorkerOptions.workerSrc = workerUrl;
 
+const pdfAssetBaseUrl = new URL(import.meta.env.BASE_URL, window.location.origin);
+const cMapUrl = new URL("pdfjs/cmaps/", pdfAssetBaseUrl).toString();
+const standardFontDataUrl = new URL("pdfjs/standard_fonts/", pdfAssetBaseUrl).toString();
+
 interface PdfAnnotation {
   id: string;
   segment: number;
@@ -131,7 +135,13 @@ async function loadPdf() {
   try {
     if (pdfDocument) await pdfDocument.destroy();
     const data = await props.blob.arrayBuffer();
-    const loadingTask = getDocument({ data });
+    const loadingTask = getDocument({
+      data,
+      cMapUrl,
+      cMapPacked: true,
+      standardFontDataUrl,
+      useSystemFonts: true,
+    });
     pdfDocument = await loadingTask.promise;
 
     const pageEntries: Array<{ proxy: PDFPageProxy; meta: PageMeta }> = [];

@@ -5,6 +5,30 @@ import pytest
 from app.services.rag_service import RAGService
 
 
+class _ScalarResult:
+    def __init__(self, value):
+        self.value = value
+
+    def first(self):
+        return self.value
+
+
+class _QueryResult:
+    def __init__(self, value):
+        self.value = value
+
+    def scalars(self):
+        return _ScalarResult(self.value)
+
+
+class _FakeDb:
+    def __init__(self, analysis):
+        self.analysis = analysis
+
+    async def execute(self, _statement):
+        return _QueryResult(self.analysis)
+
+
 @pytest.mark.asyncio
 async def test_document_question_without_context_returns_not_found(monkeypatch):
     service = RAGService()
@@ -31,3 +55,36 @@ def test_lexical_overlap_filters_unrelated_evidence():
 
     assert service._has_lexical_overlap("회의 날짜와 시간", "회의 일시는 7월 20일 오전 10시입니다.")
     assert not service._has_lexical_overlap("부산 출장비 항공권", "회의 일시는 7월 20일 오전 10시입니다.")
+
+
+@pytest.mark.asyncio
+async def test_summary_request_uses_saved_analysis_without_keyword_overlap(monkeypatch):
+    service = RAGService()
+    analysis = type(
+        "Analysis",
+        (),
+        {
+            "summary": "창의융합 수업의 운영 방식과 과제 일정을 설명하는 문서입니다.",
+            "paragraphs": [
+                {
+                    "summary": "학생은 14주차에 결과물을 제출합니다.",
+                    "easy": "14주차에 결과물을 내야 합니다.",
+                    "original": "14주차 결과물 제출",
+                }
+            ],
+        },
+    )()
+
+    async def no_embedding(_text):
+        return []
+
+    monkeypatch.setattr(service, "get_embedding", no_embedding)
+    context, citations = await service.retrieve_context_bundle(
+        _FakeDb(analysis),
+        "내용 요약해줘",
+        uuid4(),
+    )
+
+    assert "창의융합 수업의 운영 방식" in context
+    assert "14주차에 결과물을 제출" in context
+    assert citations[0]["section"] == "요약"
