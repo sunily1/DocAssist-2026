@@ -10,7 +10,12 @@ import openai
 import tiktoken
 
 from app.core.config import settings
-from app.services.easy_converter import build_easy_conversion, has_valid_openai_key, normalize_intensity
+from app.services.easy_converter import (
+    build_easy_conversion,
+    has_valid_openai_key,
+    is_meaningful_change,
+    normalize_intensity,
+)
 
 
 def build_openai_client():
@@ -145,18 +150,49 @@ class DocumentProcessor:
         layout: list[dict[str, Any]],
         paragraphs: list[dict[str, Any]],
     ) -> list[dict[str, Any]]:
-        """분석 문단을 추출 순서에 맞춰 PDF 블록에 연결합니다."""
-        converted = [
-            str(paragraph.get("easy") or paragraph.get("original") or "").strip()
-            for paragraph in paragraphs
-        ]
-        block_index = 0
+        """실제 원문 표현이 있는 PDF 블록만 쉬운말로 부분 치환합니다."""
         for page in layout:
             for block in page.get("blocks", []):
-                if block_index < len(converted) and converted[block_index]:
-                    block["easy"] = converted[block_index]
-                block_index += 1
+                original = str(block.get("original") or "")
+                easy = original
+                changes = self._pdf_changes_for_block(original, paragraphs)
+                for _, _, term in sorted(
+                    changes,
+                    key=lambda item: len(str(item[2].get("from") or "")),
+                    reverse=True,
+                ):
+                    source = str(term.get("from") or "").strip()
+                    replacement = str(term.get("to") or "").strip()
+                    if source and replacement and source != replacement:
+                        easy = easy.replace(source, replacement)
+                block["easy"] = easy
         return layout
+
+    def _pdf_changes_for_block(
+        self,
+        block_text: str,
+        paragraphs: list[dict[str, Any]],
+    ) -> list[tuple[int, int, dict[str, Any]]]:
+        """PDF 블록 원문에 실제로 존재하는 변경 표현과 원래 문단 위치를 반환합니다."""
+        text = str(block_text or "")
+        matches: list[tuple[int, int, dict[str, Any]]] = []
+        seen: set[tuple[str, str]] = set()
+        for paragraph_index, paragraph in enumerate(paragraphs):
+            for term_index, term in enumerate(paragraph.get("changed_terms") or []):
+                source = str(term.get("from") or "").strip()
+                replacement = str(term.get("to") or "").strip()
+                key = (source, replacement)
+                if (
+                    source
+                    and replacement
+                    and source != replacement
+                    and is_meaningful_change(source, replacement)
+                    and source in text
+                    and key not in seen
+                ):
+                    matches.append((paragraph_index, term_index, term))
+                    seen.add(key)
+        return matches
 
     def _pdf_font_path(self) -> str | None:
         configured = os.getenv("PDF_KOREAN_FONT_PATH", "").strip()
@@ -182,8 +218,8 @@ class DocumentProcessor:
         file_path: str,
         paragraphs: list[dict[str, Any]],
     ) -> bytes:
-        """원본 페이지/그래픽을 유지하고 텍스트 블록만 변환문으로 덮어씁니다."""
-        layout = self.attach_converted_pdf_text(self.extract_pdf_layout(file_path), paragraphs)
+        """원본 페이지를 유지하고 실제 변경 표현의 좌표만 쉬운말로 덮어씁니다."""
+        layout = self.extract_pdf_layout(file_path)
         font_path = self._pdf_font_path()
         if not font_path:
             raise RuntimeError("Korean PDF font is not available")
@@ -197,53 +233,192 @@ class DocumentProcessor:
 
                 for block in page_layout.get("blocks", []):
                     original = str(block.get("original") or "").strip()
-                    easy = str(block.get("easy") or original).strip()
-                    if not easy or easy == original:
+                    changes = self._pdf_changes_for_block(original, paragraphs)
+                    if not original or not changes:
                         continue
 
-                    rect = fitz.Rect(block.get("bbox", []))
-                    rect.intersect(page.rect)
-                    if rect.is_empty or rect.width < 2 or rect.height < 2:
+                    block_rect = fitz.Rect(block.get("bbox", []))
+                    block_rect.intersect(page.rect)
+                    if block_rect.is_empty:
                         continue
 
-                    cover = fitz.Rect(rect.x0 - 0.8, rect.y0 - 0.8, rect.x1 + 0.8, rect.y1 + 0.8)
-                    cover.intersect(page.rect)
-                    page.draw_rect(cover, color=None, fill=(1, 1, 1), overlay=True)
-
-                    start_size = min(float(block.get("font_size") or 10), max(6.0, rect.height * 0.78))
-                    inserted = False
-                    size = start_size
-                    while size >= 4.5:
-                        shape = page.new_shape()
-                        remaining = shape.insert_textbox(
-                            rect,
-                            easy,
-                            fontname=font_name,
-                            fontfile=font_path,
-                            fontsize=size,
-                            color=self._pdf_text_color(block.get("color")),
-                            lineheight=1.08,
-                        )
-                        if remaining >= 0:
-                            shape.commit(overlay=True)
-                            inserted = True
-                            break
-                        size -= 0.5
-
-                    if not inserted:
-                        fallback = easy[: max(1, int(rect.width / 4.5) * max(1, int(rect.height / 6)))]
-                        page.insert_textbox(
-                            rect,
-                            fallback,
-                            fontname=font_name,
-                            fontfile=font_path,
-                            fontsize=4.5,
-                            color=self._pdf_text_color(block.get("color")),
-                            lineheight=1.0,
-                            overlay=True,
-                        )
+                    for _, _, term in changes:
+                        source = str(term.get("from") or "").strip()
+                        replacement = str(term.get("to") or "").strip()
+                        if not source or not replacement:
+                            continue
+                        for source_rect in page.search_for(source, clip=block_rect):
+                            target = source_rect & page.rect
+                            if target.is_empty:
+                                continue
+                            self._replace_pdf_phrase_at_rect(
+                                page,
+                                target,
+                                replacement,
+                                font_name=font_name,
+                                font_path=font_path,
+                                preferred_size=float(block.get("font_size") or 10),
+                                color=self._pdf_text_color(block.get("color")),
+                            )
 
             return doc.tobytes(garbage=4, deflate=True, clean=True)
+
+    def _replace_pdf_phrase_at_rect(
+        self,
+        page: fitz.Page,
+        rect: fitz.Rect,
+        replacement: str,
+        *,
+        font_name: str,
+        font_path: str,
+        preferred_size: float,
+        color: tuple[float, float, float],
+    ) -> bool:
+        """원문 표현의 사각형 안에 들어갈 때만 해당 영역을 가리고 쉬운말을 삽입합니다."""
+        target = fitz.Rect(rect.x0 - 0.5, rect.y0 - 0.3, rect.x1 + 0.5, rect.y1 + 0.3)
+        target.intersect(page.rect)
+        start_size = min(preferred_size, max(5.0, target.height * 0.76))
+        size = start_size
+        while size >= 3.5:
+            shape = page.new_shape()
+            remaining = shape.insert_textbox(
+                target,
+                replacement,
+                fontname=font_name,
+                fontfile=font_path,
+                fontsize=size,
+                color=color,
+                lineheight=1.0,
+            )
+            if remaining >= 0:
+                page.draw_rect(target, color=None, fill=(1, 1, 1), overlay=True)
+                shape.commit(overlay=True)
+                return True
+            size -= 0.5
+        return False
+
+    def build_pdf_change_annotations(
+        self,
+        file_path: str,
+        paragraphs: list[dict[str, Any]],
+        mode: str = "converted",
+        converted_pdf: bytes | None = None,
+    ) -> list[dict[str, Any]]:
+        """PDF 페이지에서 변경 표현의 실제 좌표를 찾아 뷰어 오버레이로 반환합니다."""
+        normalized_mode = "original" if mode == "original" else "converted"
+        layout = self.extract_pdf_layout(file_path)
+        if normalized_mode == "converted":
+            pdf_bytes = converted_pdf or self.build_layout_preserved_pdf(file_path, paragraphs)
+            pdf = fitz.open(stream=pdf_bytes, filetype="pdf")
+        else:
+            pdf = fitz.open(file_path)
+
+        annotations: list[dict[str, Any]] = []
+        try:
+            for page_index, page_layout in enumerate(layout):
+                if page_index >= len(pdf):
+                    break
+                page = pdf[page_index]
+                page_width = float(page.rect.width)
+                page_height = float(page.rect.height)
+
+                for block in page_layout.get("blocks", []):
+                    original_text = str(block.get("original") or "").strip()
+                    converted_block = self.attach_converted_pdf_text(
+                        [{"blocks": [dict(block)]}], paragraphs
+                    )[0]["blocks"][0]
+                    easy_text = str(converted_block.get("easy") or original_text).strip()
+                    clip = fitz.Rect(block.get("bbox", []))
+                    clip.intersect(page.rect)
+
+                    for paragraph_index, term_index, term in self._pdf_changes_for_block(
+                        original_text, paragraphs
+                    ):
+                        original = str(term.get("from") or "").strip()
+                        easy = str(term.get("to") or "").strip()
+                        if not original or not easy or original == easy or clip.is_empty:
+                            continue
+
+                        needle = original if normalized_mode == "original" else easy
+                        rects = self._search_pdf_phrase(page, needle, clip)
+                        approximate = False
+                        if not rects:
+                            block_text = original_text if normalized_mode == "original" else easy_text
+                            estimated = self._estimate_pdf_phrase_rect(clip, block_text, needle)
+                            rects = [estimated] if estimated else []
+                            approximate = bool(rects)
+
+                        annotation_id = f"{paragraph_index}-{term_index}-{original}-{easy}"
+                        for segment, rect in enumerate(rects):
+                            annotations.append(
+                                {
+                                    "id": annotation_id,
+                                    "segment": segment,
+                                    "page": page_index + 1,
+                                    "page_width": round(page_width, 3),
+                                    "page_height": round(page_height, 3),
+                                    "x": round(float(rect.x0), 3),
+                                    "y": round(float(rect.y0), 3),
+                                    "width": round(float(rect.width), 3),
+                                    "height": round(float(rect.height), 3),
+                                    "original": original,
+                                    "easy": easy,
+                                    "definition": str(term.get("definition") or "").strip(),
+                                    "approximate": approximate,
+                                }
+                            )
+        finally:
+            pdf.close()
+        return annotations
+
+    def _search_pdf_phrase(self, page: fitz.Page, phrase: str, clip: fitz.Rect) -> list[fitz.Rect]:
+        candidates = [phrase]
+        compact = " ".join(phrase.split())
+        if compact and compact != phrase:
+            candidates.append(compact)
+        prefix = compact
+        while len(prefix) > 2:
+            prefix = prefix[:-1]
+            if prefix not in candidates and len(prefix) >= max(2, len(compact) // 2):
+                candidates.append(prefix)
+
+        for candidate in candidates:
+            found = page.search_for(candidate, clip=clip)
+            if found:
+                return [rect & page.rect for rect in found if not (rect & page.rect).is_empty]
+        return []
+
+    def _estimate_pdf_phrase_rect(
+        self,
+        block: fitz.Rect,
+        block_text: str,
+        phrase: str,
+    ) -> fitz.Rect | None:
+        text = " ".join(str(block_text or "").split())
+        needle = " ".join(str(phrase or "").split())
+        if not text or not needle or block.is_empty:
+            return None
+
+        index = text.find(needle)
+        if index < 0:
+            prefix = needle
+            while len(prefix) >= 2 and (index := text.find(prefix)) < 0:
+                prefix = prefix[:-1]
+            if index < 0 or len(prefix) < 2:
+                return None
+            needle = prefix
+
+        line_height = max(8.0, min(block.height, 16.0))
+        estimated_lines = max(1, round(block.height / line_height))
+        chars_per_line = max(1, int(len(text) / estimated_lines))
+        line_index = min(estimated_lines - 1, index // chars_per_line)
+        column = index % chars_per_line
+        line_chars = min(chars_per_line, max(1, len(text) - line_index * chars_per_line))
+        x0 = block.x0 + block.width * min(1.0, column / line_chars)
+        width = max(8.0, block.width * min(1.0, len(needle) / line_chars))
+        y0 = block.y0 + block.height * (line_index / estimated_lines)
+        y1 = block.y0 + block.height * ((line_index + 1) / estimated_lines)
+        return fitz.Rect(x0, y0, min(block.x1, x0 + width), y1)
 
     def _extract_docx_text(self, file_path: str) -> str:
         """DOCX 내부 XML에서 문단 텍스트를 추출합니다."""
@@ -360,7 +535,8 @@ Guidelines:
 2. Preserve business meaning. Do not invent obligations not present in the document.
 3. Process the main paragraphs in order. If the document is long, include the most important paragraphs.
 4. Extract action items, dates, amounts, conditions, owners, and difficult term explanations when present.
-5. Return only valid JSON.
+5. Do not replace ordinary words that are already easy, such as "일정". Keep replacements concise and preferably no longer than the source expression.
+6. Return only valid JSON.
 """
 
         try:
@@ -376,7 +552,7 @@ Guidelines:
             )
 
             content = response.choices[0].message.content
-            result = json.loads(content)
+            result = self._sanitize_analysis_changes(json.loads(content))
             result.setdefault("intensity", normalized_intensity)
             result.setdefault("intensity_label", fallback_result["intensity_label"])
             result.setdefault("converted_text", "\n\n".join(p.get("easy", "") for p in result.get("paragraphs", [])))
@@ -388,6 +564,39 @@ Guidelines:
         except Exception:
             print("Error analyzing document with LLM. Falling back to local conversion.")
             return fallback_result
+
+    def _sanitize_analysis_changes(self, result: dict[str, Any]) -> dict[str, Any]:
+        """부자연스럽게 길어진 변경은 원문으로 되돌리고 변경 목록에서도 제외합니다."""
+        allowed_pairs: set[tuple[str, str]] = set()
+        for paragraph in result.get("paragraphs") or []:
+            original = str(paragraph.get("original") or "")
+            easy = str(paragraph.get("easy") or original)
+            kept_terms: list[dict[str, Any]] = []
+            for term in paragraph.get("changed_terms") or []:
+                source = str(term.get("from") or "").strip()
+                replacement = str(term.get("to") or "").strip()
+                if is_meaningful_change(source, replacement):
+                    kept_terms.append(term)
+                    allowed_pairs.add((source, replacement))
+                elif source and replacement and source in original:
+                    easy = easy.replace(replacement, source)
+            paragraph["easy"] = easy
+            paragraph["changed_terms"] = kept_terms
+
+        result["terms"] = [
+            term
+            for term in result.get("terms") or []
+            if (
+                str(term.get("term") or "").strip(),
+                str(term.get("replacement") or "").strip(),
+            ) in allowed_pairs
+        ]
+        result["converted_text"] = "\n\n".join(
+            str(paragraph.get("easy") or paragraph.get("original") or "").strip()
+            for paragraph in result.get("paragraphs") or []
+            if str(paragraph.get("easy") or paragraph.get("original") or "").strip()
+        )
+        return result
 
     def _is_low_quality_analysis(self, source_text: str, result: dict[str, Any]) -> bool:
         converted = str(result.get("converted_text") or "").strip()

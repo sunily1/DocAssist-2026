@@ -14,11 +14,22 @@ interface User {
 }
 
 export const useAuthStore = defineStore('auth', () => {
-  const token = ref<string | null>(localStorage.getItem('token'));
+  const token = ref<string | null>(localStorage.getItem('token') || sessionStorage.getItem('token'));
   const user = ref<User | null>(null);
   const isAuthenticated = computed(() => !!token.value);
 
-  async function login(email: string, password: string): Promise<boolean> {
+  function clearAuthStorage() {
+    for (const storage of [localStorage, sessionStorage]) {
+      storage.removeItem('token');
+      storage.removeItem('role');
+    }
+  }
+
+  function currentAuthStorage() {
+    return localStorage.getItem('token') ? localStorage : sessionStorage;
+  }
+
+  async function login(email: string, password: string, remember = false): Promise<boolean> {
     try {
       // OAuth2PasswordRequestForm은 폼 데이터를 기대합니다
       const params = new URLSearchParams();
@@ -31,8 +42,10 @@ export const useAuthStore = defineStore('auth', () => {
       
       token.value = response.data.access_token;
       if (token.value) {
-          localStorage.setItem('token', token.value);
-          await fetchUser();
+        clearAuthStorage();
+        const storage = remember ? localStorage : sessionStorage;
+        storage.setItem('token', token.value);
+        await fetchUser();
       }
       return true;
     } catch (error) {
@@ -58,7 +71,7 @@ export const useAuthStore = defineStore('auth', () => {
       user.value = response.data;
       // role 저장 (Router 가드용)
       if (user.value?.role) {
-        localStorage.setItem('role', user.value.role);
+        currentAuthStorage().setItem('role', user.value.role);
       }
     } catch (error: any) {
       console.error('Fetch user failed', error);
@@ -108,8 +121,7 @@ export const useAuthStore = defineStore('auth', () => {
   function logout() {
     token.value = null;
     user.value = null;
-    localStorage.removeItem('token');
-    localStorage.removeItem('role');
+    clearAuthStorage();
   }
 
   return { token, user, isAuthenticated, login, signup, fetchUser, updateUser, changePassword, logout };

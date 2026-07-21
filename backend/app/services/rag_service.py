@@ -47,6 +47,10 @@ class RAGService:
         ratio = overlap / max(len(query_tokens), 1)
         return max(35, min(96, int(45 + ratio * 50 + overlap * 4)))
 
+    def _has_lexical_overlap(self, query: str, text: str) -> bool:
+        query_tokens = self._tokens(query)
+        return bool(query_tokens and query_tokens & self._tokens(text))
+
     def _make_citation(self, idx: int, section: str, score: int, quote: str) -> dict:
         return {
             "citeId": f"doc-{idx}",
@@ -94,7 +98,7 @@ class RAGService:
                 embeddings = result.scalars().all()
                 for idx, emb in enumerate(embeddings, start=1):
                     quote = (emb.chunk_content or "").strip()
-                    if not quote:
+                    if not quote or not self._has_lexical_overlap(query, quote):
                         continue
                     section = f"청크 {emb.chunk_index + 1}"
                     score = max(48, 92 - (idx - 1) * 8)
@@ -133,6 +137,7 @@ class RAGService:
             if text:
                 candidates.append((f"문단 {idx}", text, self._score_text(query, text)))
 
+        candidates = [candidate for candidate in candidates if candidate[2] > 45]
         candidates.sort(key=lambda item: item[2], reverse=True)
         for idx, (section, text, score) in enumerate(candidates[:top_k], start=1):
             quote = text[:700]
@@ -189,6 +194,16 @@ class RAGService:
         citations: list[dict] = []
         if document_id:
             context, citations = await self.retrieve_context_bundle(db, query, document_id)
+
+        if document_id and not context:
+            return ChatMessageCreate(
+                role="assistant",
+                content="선택한 문서에서 질문과 관련된 내용을 찾지 못했습니다.",
+                model_name=model or self.model_name,
+                prompt_tokens=0,
+                completion_tokens=0,
+                citations=[],
+            )
 
         system_message_content = (
             "You are DocAssist, a Korean business document assistant. "

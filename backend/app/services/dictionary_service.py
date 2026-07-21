@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 import re
 import time
@@ -122,8 +123,20 @@ async def search_dictionary(q: str, limit: int = 5) -> list[dict[str, str]]:
         "num": str(max(1, min(limit, 100))),
         "sort": "wt",
     }
+    response: httpx.Response | None = None
     async with httpx.AsyncClient(timeout=8) as client:
-        response = await client.get(settings.DICTIONARY_API_URL, params=params)
+        for attempt in range(2):
+            try:
+                response = await client.get(settings.DICTIONARY_API_URL, params=params)
+                if response.status_code < 500 or attempt == 1:
+                    break
+            except httpx.RequestError:
+                if attempt == 1:
+                    raise
+            await asyncio.sleep(0.35)
+
+    if response is None:
+        raise ValueError("온용어 API에서 응답을 받지 못했습니다.")
 
     text = response.text.strip()
     if response.status_code >= 400:

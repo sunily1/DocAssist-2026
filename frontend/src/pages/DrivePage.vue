@@ -9,15 +9,19 @@
 
       <section class="doq-drive-filters">
         <label class="doq-search"><span>⌕</span><input v-model="q" placeholder="문서 검색" /></label>
-        <select v-model="typeFilter"><option value="all">유형 전체</option><option value="PDF">PDF</option><option value="DOCX">DOCX</option><option value="TXT">TXT</option></select>
-        <select v-model="sortBy"><option value="new">최신순</option><option value="old">오래된순</option><option value="title">제목순</option></select>
+        <select v-model="typeFilter" aria-label="문서 유형"><option value="all">유형 전체</option><option value="PDF">PDF</option><option value="DOCX">DOCX</option><option value="TXT">TXT</option></select>
+        <select v-model="statusFilter" aria-label="문서 상태"><option value="all">상태 전체</option><option value="done">완료</option><option value="processing">분석 중</option><option value="queued">대기</option><option value="failed">실패</option></select>
+        <select v-model="sortBy" aria-label="정렬"><option value="new">최신순</option><option value="old">오래된순</option><option value="title">제목순</option></select>
       </section>
 
       <section class="doq-doc-grid">
         <article v-for="doc in pagedDocs" :key="doc.id" class="doq-doc-card" :class="{ disabled: doc.status !== 'done' }" @click="openDoc(doc)">
           <div class="doq-doc-top">
             <span :class="['doq-doc-type', `type-${doc.type.toLowerCase()}`]">{{ doc.type }}</span>
-            <span :class="['doq-status', badgeClass(doc.status)]">{{ designStatusLabel(doc.status) }}</span>
+            <div class="doq-doc-actions">
+              <span :class="['doq-status', badgeClass(doc.status)]">{{ designStatusLabel(doc.status) }}</span>
+              <button type="button" :title="`${doc.title} 삭제`" :aria-label="`${doc.title} 삭제`" :disabled="deletingIds.has(doc.id)" @click.stop="removeDocument(doc)"><Trash2 :size="15" /></button>
+            </div>
           </div>
           <strong>{{ doc.title.replace(/\.[^.]+$/, '') }}</strong>
           <p>{{ formatDate(doc.createdAt) }} · {{ designDocMeta(doc.status) }}</p>
@@ -38,6 +42,7 @@ import { useRouter } from "vue-router";
 import documentService from "../api/document.service";
 import { useAuthStore } from "../stores/auth";
 import AppLayout from "../components/layout/AppLayout.vue";
+import { Trash2 } from "@lucide/vue";
 
 type DocStatus = "queued" | "processing" | "done" | "failed";
 type DocType = "PDF" | "DOCX" | "TXT" | "UNKNOWN";
@@ -87,6 +92,7 @@ const perPage = 6;
 
 const docs = ref<DocItem[]>([]);
 const selectedIds = ref<Set<string>>(new Set());
+const deletingIds = ref<Set<string>>(new Set());
 
 async function fetchDocuments() {
     try {
@@ -186,6 +192,22 @@ function openDoc(doc: DocItem) {
   router.push({ name: "documentView", params: { id: doc.id } }).catch(() => {});
 }
 
+async function removeDocument(doc: DocItem) {
+  if (!window.confirm(`'${doc.title}' 문서를 삭제할까요?`)) return;
+  deletingIds.value = new Set(deletingIds.value).add(doc.id);
+  try {
+    await documentService.deleteDocument(doc.id);
+    docs.value = docs.value.filter((item) => item.id !== doc.id);
+  } catch (error) {
+    console.error("Failed to delete document", error);
+    alert("문서를 삭제하지 못했습니다. 잠시 후 다시 시도해 주세요.");
+  } finally {
+    const next = new Set(deletingIds.value);
+    next.delete(doc.id);
+    deletingIds.value = next;
+  }
+}
+
 //  액션들
 </script>
 
@@ -198,11 +220,17 @@ function openDoc(doc: DocItem) {
 .doq-drive-filters { margin-bottom: 20px; display: flex; gap: 10px; }
 .doq-search { height: 44px; padding: 0 14px; display: flex; align-items: center; gap: 9px; flex: 1; border: 1px solid var(--line); border-radius: 13px; background: var(--surface); }
 .doq-search span { color: var(--muted); font-size: 22px; line-height: 1; transform: rotate(-15deg); }.doq-search input { min-width: 0; flex: 1; border: 0; outline: 0; color: var(--ink); background: transparent; font-size: 14px; }
-.doq-drive-filters select { height: 44px; padding: 0 34px 0 16px; border: 1px solid var(--line); border-radius: 13px; color: var(--sub); background: var(--surface); font-size: 13.5px; font-weight: 600; cursor: pointer; }
+.doq-drive-filters select { height: 44px; padding: 0; appearance: none; border: 1px solid var(--line); border-radius: 13px; color: var(--sub); background: var(--surface); font-size: 13.5px; font-weight: 600; text-align: center; cursor: pointer; }
+.doq-drive-filters select { width: 88px; }
+.doq-drive-filters select:last-of-type { width: 76px; }
 .doq-doc-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
 .doq-doc-card { min-width: 0; padding: 20px; border: 1px solid var(--line); border-radius: 18px; background: var(--surface); cursor: pointer; transition: border-color .16s ease, transform .16s ease; }
 .doq-doc-card:not(.disabled):hover { border-color: var(--accent-border); transform: translateY(-2px); }.doq-doc-card.disabled { cursor: default; }
 .doq-doc-top { margin-bottom: 16px; display: flex; align-items: center; justify-content: space-between; }
+.doq-doc-actions { display: flex; align-items: center; gap: 7px; }
+.doq-doc-actions > button { width: 30px; height: 30px; display: grid; place-items: center; border: 1px solid var(--line); border-radius: 9px; color: var(--muted); background: var(--surface); cursor: pointer; }
+.doq-doc-actions > button:hover { border-color: #efb4bd; color: #bd3048; background: #fff3f5; }
+.doq-doc-actions > button:disabled { opacity: .45; cursor: wait; }
 .doq-doc-type { width: 44px; height: 44px; display: grid; place-items: center; border-radius: 13px; color: #e14a6b; background: #fdecef; font-size: 11px; font-weight: 700; }
 .doq-doc-type.type-docx { color: #3f68e0; background: #eaf0ff; }.doq-doc-type.type-txt, .doq-doc-type.type-unknown { color: #5b6472; background: #eef1f4; }
 .doq-status { padding: 4px 9px; border-radius: 999px; font-size: 11px; font-weight: 600; }.doq-status.badge-ok { color: #0c7a68; background: #e7f8f3; }.doq-status.badge-warn { color: #a9711a; background: #fff6e6; }.doq-status.badge-bad { color: #c0392b; background: #fdeef0; }

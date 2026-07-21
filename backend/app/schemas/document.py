@@ -138,3 +138,26 @@ class TextDocxDownloadRequest(TextConvertRequest):
     """직접 변환 결과 DOCX 다운로드 요청."""
 
     mode: str = "summary"
+
+
+class DocumentAnnotationRead(BaseModel):
+    """실제 파일 페이지 위에 표시할 변경 표현 좌표."""
+
+    id: str
+    segment: int = 0
+    page: int
+    page_width: float
+    page_height: float
+    x: float
+    y: float
+    width: float
+    height: float
+    original: str
+    easy: str
+    definition: str = ""
+    approximate: bool = False
+
+
+class DocumentAnnotationsRead(BaseModel):
+    mode: str
+    annotations: List[DocumentAnnotationRead] = Field(default_factory=list)

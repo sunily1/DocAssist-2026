@@ -100,9 +100,9 @@ function openDocument(id: string) { router.push({ name: "documentView", params: 
 .home-page { width: min(1080px, 100%); margin: 0 auto; padding: 34px 40px 56px; }
 .page-head { margin-bottom: 26px; display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
 .today { margin-bottom: 5px; color: var(--muted); font-size: 13px; font-weight: 500; }
-.page-head h1 { margin: 0; font-size: 27px; line-height: 1.3; }
+.page-head h1 { margin: 0; font-size: 27px; }
 .new-doc { height: 44px; padding: 0 20px; border: 0; border-radius: 13px; color: #fff; background: var(--accent-gradient); box-shadow: 0 8px 18px rgb(106 77 255 / .26); font-size: 14px; font-weight: 600; cursor: pointer; }
-.hero { margin-bottom: 20px; padding: 30px 32px; overflow: hidden; border: 1px solid var(--line); border-radius: 22px; background: #eef0ff; }
+.hero { margin-bottom: 20px; padding: 30px 32px; overflow: hidden; border: 1px solid var(--line); border-radius: 22px; background: var(--soft); }
 [data-theme="dark"] .hero { background: var(--soft); }
 .hero-copy { max-width: 560px; }
 .eyebrow { display: inline-block; margin-bottom: 14px; padding: 5px 11px; border: 1px solid #e8e6f6; border-radius: 999px; color: var(--accent); background: var(--surface); font-size: 12px; font-weight: 600; }
@@ -113,7 +113,7 @@ function openDocument(id: string) { router.push({ name: "documentView", params: 
 .stat-grid { margin-bottom: 20px; display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
 .stat { padding: 18px 20px; border: 1px solid var(--line); border-radius: 18px; background: var(--surface); }
 .stat span { display: block; margin-bottom: 10px; color: var(--muted); font-size: 13px; font-weight: 500; }
-.stat strong { font-family: "Space Grotesk", sans-serif; font-size: 28px; line-height: 1; }
+.stat strong { font-family: "Space Grotesk", sans-serif; font-size: 28px; }
 .stat.done strong { color: #12a58a; }
 .stat.waiting strong { color: #e0952a; }
 .home-grid { display: grid; grid-template-columns: 1.5fr 1fr; gap: 16px; }

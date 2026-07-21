@@ -48,7 +48,6 @@ EASY_TERMS: "OrderedDict[str, tuple[str, str]]" = OrderedDict(
         ("필히", ("반드시", "꼭 해야 한다는 뜻입니다.")),
         ("불가", ("할 수 없음", "진행하거나 처리할 수 없다는 뜻입니다.")),
         ("가능 여부", ("할 수 있는지", "진행할 수 있는지 확인한다는 뜻입니다.")),
-        ("일정", ("날짜와 시간 계획", "업무가 진행되는 날짜와 시간 계획입니다.")),
         ("담당자", ("맡은 사람", "그 일을 책임지고 처리하는 사람입니다.")),
         ("전사", ("회사 전체", "회사 전체가 대상이라는 뜻입니다.")),
         ("수립", ("계획 세우기", "계획이나 기준을 만드는 것입니다.")),
@@ -81,6 +80,17 @@ def has_valid_openai_key(key: str | None) -> bool:
     stripped = key.strip()
     blocked = ("...", "CHANGE", "your_", "changeme", "none", "null")
     return len(stripped) >= 24 and not any(token in stripped.lower() for token in blocked)
+
+
+def is_meaningful_change(source: str | None, replacement: str | None) -> bool:
+    """쉬운말이 원문보다 과도하게 길어져 오히려 이해를 방해하는 변경을 제외합니다."""
+    original = re.sub(r"\s+", "", str(source or "").strip())
+    easy = re.sub(r"\s+", "", str(replacement or "").strip())
+    if not original or not easy or original == easy:
+        return False
+    if len(original) <= 2 and len(easy) > len(original) * 3:
+        return False
+    return True
 
 
 def split_paragraphs(text: str) -> list[str]:

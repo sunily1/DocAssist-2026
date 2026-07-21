@@ -21,11 +21,11 @@ type Role = "USER" | "ADMIN";
  * 🔐 인증 정보 읽기 (데모 기준)
  */
 function getAuth() {
-  const token = localStorage.getItem("token");
-  // role이 없으면 빈 문자열 또는 null로 처리
-  // AdminPage 접근 시 requiresAdmin 체크에서 role === 'ADMIN'을 엄격하게 비교하므로
-  // role 저장 로직이 확실해야 함.
-  const role = localStorage.getItem("role") as Role | null;
+  const persistentToken = localStorage.getItem("token");
+  const sessionToken = sessionStorage.getItem("token");
+  const token = persistentToken || sessionToken;
+  const storage = persistentToken ? localStorage : sessionStorage;
+  const role = storage.getItem("role") as Role | null;
 
   return {
     isAuthed: !!token,

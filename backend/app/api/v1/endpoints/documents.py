@@ -14,6 +14,7 @@ from app.db.session import SessionLocal
 from app.models.user import User
 from app.models.system import SystemLog
 from app.schemas.document import (
+    DocumentAnnotationsRead,
     DocumentRead,
     DocumentUpdate,
     DocumentWithAnalysis,
@@ -255,6 +256,21 @@ async def download_layout_pdf(
         media_type="application/pdf",
         headers={"Content-Disposition": f"inline; filename*=UTF-8''{encoded}"},
     )
+
+
+@router.get("/{document_id}/annotations", response_model=DocumentAnnotationsRead)
+async def read_document_annotations(
+    document_id: UUID,
+    mode: str = Query("converted", pattern="^(converted|original)$"),
+    current_user: User = Depends(deps.get_current_user),
+    db: AsyncSession = Depends(deps.get_db),
+) -> Any:
+    """실제 PDF 페이지 위에 표시할 변경 표현 좌표를 반환합니다."""
+    document = await _get_doc_or_404(db, document_id, current_user)
+    return {
+        "mode": mode,
+        "annotations": document_service.build_pdf_annotations(document, mode),
+    }
 
 
 @router.patch("/{document_id}", response_model=DocumentRead)

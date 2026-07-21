@@ -50,7 +50,7 @@
           </label>
 
           <div class="form-options">
-            <label><input type="checkbox" /> 로그인 유지</label>
+            <label><input v-model="rememberMe" type="checkbox" /> 로그인 유지</label>
             <button type="button" @click="goForgot">비밀번호 찾기</button>
           </div>
 
@@ -78,6 +78,7 @@ const router = useRouter();
 const authStore = useAuthStore();
 const email = ref("");
 const password = ref("");
+const rememberMe = ref(false);
 const showPassword = ref(false);
 const loading = ref(false);
 const errorMsg = ref("");
@@ -86,7 +87,7 @@ async function login() {
   loading.value = true;
   errorMsg.value = "";
   try {
-    await authStore.login(email.value, password.value);
+    await authStore.login(email.value, password.value, rememberMe.value);
     router.push({ name: "home" });
   } catch (error: any) {
     errorMsg.value = error.response?.data?.detail || "로그인에 실패했습니다. 이메일과 비밀번호를 확인해 주세요.";

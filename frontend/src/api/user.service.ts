@@ -12,4 +12,10 @@ export default {
   updateFeedback(rating: SatisfactionRating) {
     return api.put('/users/me/feedback', { rating });
   },
+  createInquiry(payload: { type: string; content: string; reply_email: string }) {
+    return api.post('/users/me/inquiries', payload);
+  },
+  getInquiries() {
+    return api.get('/users/me/inquiries');
+  },
 };

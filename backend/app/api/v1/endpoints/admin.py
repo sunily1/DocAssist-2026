@@ -1,4 +1,6 @@
+from datetime import datetime, timezone
 from typing import List, Any
+from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import text, select
@@ -7,8 +9,10 @@ from app.services.dictionary_service import get_dictionary_status
 
 from app.api import deps
 from app.models.user import User, UserRole
+from app.models.system import SupportTicket, TicketStatus
 from app.models.document import Document
 from app.schemas.user import UserRead
+from app.schemas.support import InquiryAnswer, InquiryRead
 from app.api.deps import get_current_admin_user
 
 router = APIRouter()
@@ -86,6 +90,29 @@ async def get_system_metrics(
 
     llm_status = await get_llm_status()
     dictionary_status = await get_dictionary_status()
+    trend_rows = (
+        await db.execute(
+            text(
+                "WITH days AS ("
+                " SELECT generate_series(current_date - interval '7 days', current_date, interval '1 day')::date AS day"
+                "), signups AS ("
+                " SELECT created_at::date AS day, count(*) AS value FROM users"
+                " WHERE created_at >= current_date - interval '7 days' GROUP BY created_at::date"
+                "), conversions AS ("
+                " SELECT created_at::date AS day, count(*) AS value FROM system_logs"
+                " WHERE level = 'METRIC' AND message = 'text_convert'"
+                " AND created_at >= current_date - interval '7 days' GROUP BY created_at::date"
+                "), uploads AS ("
+                " SELECT created_at::date AS day, count(*) AS value FROM documents"
+                " WHERE deleted_at IS NULL AND created_at >= current_date - interval '7 days' GROUP BY created_at::date"
+                ")"
+                " SELECT days.day, coalesce(signups.value, 0),"
+                " coalesce(conversions.value, 0) + coalesce(uploads.value, 0)"
+                " FROM days LEFT JOIN signups USING(day) LEFT JOIN conversions USING(day)"
+                " LEFT JOIN uploads USING(day) ORDER BY days.day"
+            )
+        )
+    ).all()
 
     return {
         "users": user_count,
@@ -121,7 +148,74 @@ async def get_system_metrics(
             "openai": llm_status,
             "dictionary": dictionary_status,
         },
+        "trend": [
+            {
+                "date": row[0].isoformat(),
+                "label": "오늘" if index == len(trend_rows) - 1 else f"{row[0].month}/{row[0].day}",
+                "signups": int(row[1]),
+                "conversions": int(row[2]),
+            }
+            for index, row in enumerate(trend_rows)
+        ],
     }
+
+
+def _inquiry_payload(ticket: SupportTicket, user: User | None) -> dict[str, Any]:
+    return {
+        "id": ticket.id,
+        "type": ticket.type,
+        "subject": ticket.subject,
+        "content": ticket.content,
+        "reply_email": ticket.reply_email,
+        "response": ticket.response,
+        "status": ticket.status,
+        "sender_name": user.name if user else "탈퇴한 사용자",
+        "sender_email": user.email if user else "-",
+        "created_at": ticket.created_at,
+        "updated_at": ticket.updated_at,
+        "resolved_at": ticket.resolved_at,
+    }
+
+
+@router.get("/inquiries", response_model=List[InquiryRead])
+async def get_inquiries(
+    current_user: User = Depends(get_current_admin_user),
+    db: AsyncSession = Depends(deps.get_db),
+) -> Any:
+    rows = (
+        await db.execute(
+            select(SupportTicket, User)
+            .outerjoin(User, SupportTicket.user_id == User.id)
+            .order_by(SupportTicket.created_at.desc())
+        )
+    ).all()
+    return [_inquiry_payload(ticket, user) for ticket, user in rows]
+
+
+@router.patch("/inquiries/{ticket_id}/answer", response_model=InquiryRead)
+async def answer_inquiry(
+    ticket_id: UUID,
+    answer_in: InquiryAnswer,
+    current_user: User = Depends(get_current_admin_user),
+    db: AsyncSession = Depends(deps.get_db),
+) -> Any:
+    row = (
+        await db.execute(
+            select(SupportTicket, User)
+            .outerjoin(User, SupportTicket.user_id == User.id)
+            .filter(SupportTicket.id == ticket_id)
+        )
+    ).first()
+    if not row:
+        raise HTTPException(status_code=404, detail="문의를 찾을 수 없습니다.")
+    ticket, user = row
+    ticket.response = answer_in.response
+    ticket.status = TicketStatus.RESOLVED
+    ticket.resolved_at = datetime.now(timezone.utc)
+    db.add(ticket)
+    await db.commit()
+    await db.refresh(ticket)
+    return _inquiry_payload(ticket, user)
 
 @router.get("/users", response_model=List[UserRead])
 async def get_all_users(

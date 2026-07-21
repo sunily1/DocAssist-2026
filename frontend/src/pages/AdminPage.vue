@@ -4,7 +4,7 @@
     <main class="doq-admin">
       <header class="doq-admin-head">
         <div><h1>관리자</h1><p>운영 현황과 사용자·문서를 관리해요.</p></div>
-        <span><i />상태: 정상</span>
+        <span :class="systemHealth.status"><i />상태: {{ systemHealth.label }}</span>
       </header>
       <nav class="doq-admin-tabs">
         <button :class="{ active: tab === 'dashboard' }" @click="tab = 'dashboard'">대시보드</button>
@@ -22,8 +22,8 @@
         </section>
         <section class="doq-trend">
           <div><h2>기간별 추이</h2><p><span><i class="violet" />가입</span><span><i class="mint" />변환</span></p></div>
-          <svg viewBox="0 0 600 170" preserveAspectRatio="none"><polyline fill="none" stroke="#6a4dff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" points="0,120 86,100 172,110 258,70 344,80 430,44 516,58 600,30"/><polyline fill="none" stroke="#12b39a" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" points="0,140 86,132 172,120 258,124 344,96 430,104 516,72 600,84"/></svg>
-          <footer><span>월</span><span>화</span><span>수</span><span>목</span><span>금</span><span>토</span><span>일</span><span>오늘</span></footer>
+          <svg viewBox="0 0 600 170" preserveAspectRatio="none" aria-label="최근 8일 가입과 변환 추이"><polyline fill="none" stroke="#6a4dff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" :points="trendPoints('signups')"/><polyline fill="none" stroke="#12b39a" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" :points="trendPoints('conversions')"/></svg>
+          <footer><span v-for="item in stats.trend" :key="item.date">{{ item.label }}</span></footer>
         </section>
         <section class="doq-chart-grid">
           <article class="doq-donut-card"><h2>시스템 만족도</h2><div><div class="doq-donut" :style="donutStyle(stats.satisfaction)"><span><b>{{ firstPercent(stats.satisfaction) }}%</b><small>만족</small></span></div><ul><li v-for="item in stats.satisfaction" :key="item.label"><i :style="{ background: item.color }" /><span>{{ item.label }}</span><b>{{ slicePercent(item, stats.satisfaction) }}%</b></li></ul></div></article>
@@ -37,18 +37,26 @@
 
       <section v-else-if="tab === 'users'" class="doq-admin-table">
         <header><h2>사용자 관리</h2><input v-model="userQ" placeholder="이메일·이름 검색" /></header>
-        <div class="doq-table-scroll"><div class="doq-user-row doq-table-head"><span>ID</span><span>이메일 · 이름</span><span>권한</span><span>상태</span><span>가입</span></div><div v-for="userItem in filteredUsers" :key="userItem.id" class="doq-user-row"><span>{{ userItem.id.slice(0, 8) }}</span><span><strong>{{ userItem.email }}</strong><small>{{ userItem.name }}</small></span><span><b class="role">{{ userItem.role }}</b></span><span><b :class="['state', userItem.is_active ? 'ok' : 'bad']">{{ userItem.is_active ? "활성" : "정지" }}</b></span><span>{{ fmt(userItem.created_at) }}</span></div></div>
+        <div class="doq-table-scroll"><div class="doq-user-row doq-table-head"><span>ID</span><span>이메일 · 이름</span><span>권한</span><span>상태</span><span>가입</span></div><div v-for="userItem in filteredUsers" :key="userItem.id" class="doq-user-row"><span>{{ userItem.id.slice(0, 8) }}</span><span><strong>{{ userItem.email }}</strong><small>{{ userItem.name }}</small></span><span><b class="role">{{ userItem.role }}</b></span><span><b :class="['state', userItem.is_active ? 'ok' : 'bad']">{{ userItem.is_active ? "활성" : "정지" }}</b></span><span>{{ fmt(userItem.created_at) }}</span></div><p v-if="filteredUsers.length === 0" class="doq-admin-empty">검색 결과가 없습니다.</p></div>
       </section>
 
       <section v-else-if="tab === 'docs'" class="doq-admin-table">
         <header><h2>문서 · 분석 관리</h2><select v-model="docStatus"><option value="all">상태 전체</option><option value="DONE">완료</option><option value="PROCESSING">처리중</option><option value="FAILED">실패</option></select></header>
-        <div class="doq-table-scroll"><div class="doq-doc-admin-row doq-table-head"><span>문서 ID</span><span>제목 · 유형</span><span>사용자</span><span>상태</span><span>업로드</span><span /></div><div v-for="doc in filteredDocs" :key="doc.id" class="doq-doc-admin-row"><span>{{ doc.id.slice(0, 8) }}</span><span><strong>{{ doc.title }}</strong><small>{{ doc.file_type }}</small></span><span>{{ doc.user_id.slice(0, 8) }}</span><span><b :class="['state', docBadge(doc.status)]">{{ docLabel(doc.status) }}</b></span><span>{{ fmt(doc.created_at) }}</span><button type="button" :disabled="doc.status !== 'DONE'" @click="openDoc(doc.id)">열기</button></div></div>
+        <div class="doq-table-scroll"><div class="doq-doc-admin-row doq-table-head"><span>문서 ID</span><span>제목 · 유형</span><span>사용자</span><span>상태</span><span>업로드</span><span /></div><div v-for="doc in filteredDocs" :key="doc.id" class="doq-doc-admin-row"><span>{{ doc.id.slice(0, 8) }}</span><span><strong>{{ doc.title }}</strong><small>{{ doc.file_type }}</small></span><span>{{ doc.user_id.slice(0, 8) }}</span><span><b :class="['state', docBadge(doc.status)]">{{ docLabel(doc.status) }}</b></span><span>{{ fmt(doc.created_at) }}</span><button type="button" :disabled="doc.status !== 'DONE'" @click="openDoc(doc.id)">열기</button></div><p v-if="filteredDocs.length === 0" class="doq-admin-empty">해당 상태의 문서가 없습니다.</p></div>
       </section>
 
       <section v-else class="doq-admin-table">
-        <header><h2>문의 관리</h2><span class="waiting">대기 2건</span></header>
-        <div class="doq-table-scroll"><div class="doq-inquiry-row doq-table-head"><span>유형</span><span>내용</span><span>보낸이</span><span>상태</span><span /></div><div v-for="item in inquiries" :key="item.content" class="doq-inquiry-row"><span><b class="kind">{{ item.kind }}</b></span><span>{{ item.content }}</span><span>{{ item.sender }}</span><span><b :class="['state', item.done ? 'ok' : 'warn']">{{ item.done ? "완료" : "대기" }}</b></span><button type="button" @click="answerInquiry(item)">{{ item.done ? "보기" : "답변" }}</button></div></div>
+        <header><h2>문의 관리</h2><span class="waiting">대기 {{ waitingInquiryCount }}건</span></header>
+        <div class="doq-table-scroll"><div class="doq-inquiry-row doq-table-head"><span>유형</span><span>내용</span><span>보낸이</span><span>상태</span><span /></div><div v-for="item in inquiries" :key="item.id" class="doq-inquiry-row"><span><b class="kind">{{ item.type }}</b></span><span>{{ item.content }}</span><span>{{ item.sender_name }}</span><span><b :class="['state', item.status === 'RESOLVED' ? 'ok' : 'warn']">{{ item.status === 'RESOLVED' ? "완료" : "대기" }}</b></span><button type="button" @click="openInquiry(item)">{{ item.status === 'RESOLVED' ? "보기" : "답변" }}</button></div><p v-if="inquiries.length === 0" class="doq-admin-empty">접수된 문의가 없습니다.</p></div>
       </section>
+      <div v-if="activeInquiry" class="doq-admin-modal-backdrop" @click.self="activeInquiry = null">
+        <section class="doq-admin-modal">
+          <header><div><h2>{{ activeInquiry.type }}</h2><span>{{ activeInquiry.sender_name }} · {{ activeInquiry.reply_email || activeInquiry.sender_email }}</span></div><button type="button" aria-label="닫기" @click="activeInquiry = null">×</button></header>
+          <p>{{ activeInquiry.content }}</p>
+          <label>답변<textarea v-model.trim="inquiryResponse" :disabled="activeInquiry.status === 'RESOLVED'" placeholder="사용자에게 전달할 답변을 입력하세요." /></label>
+          <footer><button type="button" @click="activeInquiry = null">닫기</button><button v-if="activeInquiry.status !== 'RESOLVED'" type="button" :disabled="!inquiryResponse || inquirySaving" @click="submitInquiryAnswer">{{ inquirySaving ? "저장 중" : "답변 완료" }}</button></footer>
+        </section>
+      </div>
       <div v-if="toast" class="toast">{{ toast }}</div>
     </main>
 
@@ -59,7 +67,7 @@
 import { computed, ref, onMounted, watch } from "vue";
 import { useRouter } from "vue-router";
 import AppLayout from "../components/layout/AppLayout.vue";
-import adminService, { type AdminMetrics, type MetricSlice, type UserItem, type DocItem } from "../api/admin.service";
+import adminService, { type AdminMetrics, type MetricSlice, type UserItem, type DocItem, type InquiryItem } from "../api/admin.service";
 
 const router = useRouter();
 const theme = ref<"light" | "dark">("light");
@@ -122,10 +130,17 @@ function defaultStats(): AdminMetrics {
       openai: { status: "warn", label: "OpenAI", message: "키 확인 필요" },
       dictionary: { status: "warn", label: "국어사전", message: "연동 예정" },
     },
+    trend: [],
   };
 }
 
 const stats = ref<AdminMetrics>(defaultStats());
+const systemHealth = computed(() => {
+  const statuses = Object.values(stats.value.apiStatus).map((item) => item.status);
+  if (statuses.includes("bad")) return { status: "bad", label: "장애" };
+  if (statuses.includes("warn")) return { status: "warn", label: "확인 필요" };
+  return { status: "ok", label: "정상" };
+});
 const usageMax = computed(() => Math.max(1, ...stats.value.serviceUsage.map((item) => item.value)));
 
 function mergeStats(next: AdminMetrics): AdminMetrics {
@@ -173,6 +188,17 @@ function usagePercent(value: number) {
   return Math.max(4, Math.round((Number(value || 0) / usageMax.value) * 100));
 }
 
+function trendPoints(key: "signups" | "conversions") {
+  const items = stats.value.trend || [];
+  if (!items.length) return "";
+  const max = Math.max(1, ...items.map((item) => item[key]));
+  return items.map((item, index) => {
+    const x = items.length === 1 ? 300 : (index / (items.length - 1)) * 600;
+    const y = 150 - (item[key] / max) * 120;
+    return `${x.toFixed(1)},${y.toFixed(1)}`;
+  }).join(" ");
+}
+
 function apiTone(status: string) {
   if (status === "ok") return "ok";
   if (status === "bad") return "bad";
@@ -187,14 +213,40 @@ function apiStatusLabel(status: string) {
 
 type Tab = "dashboard" | "users" | "docs" | "inquiries";
 const tab = ref<Tab>("dashboard");
-const inquiries = [
-  { kind: "오류", content: "PDF 변환이 중간에 멈춰요", sender: "최민수", done: false },
-  { kind: "제안", content: "용어 저장 폴더 기능이 있으면 좋겠어요", sender: "이하은", done: false },
-  { kind: "사용법", content: "쉬운말 저장은 어디서 하나요?", sender: "박서준", done: true },
-];
+const inquiries = ref<InquiryItem[]>([]);
+const activeInquiry = ref<InquiryItem | null>(null);
+const inquiryResponse = ref("");
+const inquirySaving = ref(false);
+const waitingInquiryCount = computed(() => inquiries.value.filter((item) => item.status !== "RESOLVED").length);
 
-function answerInquiry(item: { content: string; done: boolean }) {
-  showToast(item.done ? "완료된 문의입니다." : `답변 작성: ${item.content}`);
+async function loadInquiries() {
+  try {
+    inquiries.value = (await adminService.getInquiries()).data;
+  } catch (error) {
+    console.error("Failed to load inquiries", error);
+    showToast("문의 목록 로딩 실패");
+  }
+}
+
+function openInquiry(item: InquiryItem) {
+  activeInquiry.value = item;
+  inquiryResponse.value = item.response || "";
+}
+
+async function submitInquiryAnswer() {
+  if (!activeInquiry.value || !inquiryResponse.value || inquirySaving.value) return;
+  inquirySaving.value = true;
+  try {
+    const updated = (await adminService.answerInquiry(activeInquiry.value.id, inquiryResponse.value)).data;
+    inquiries.value = inquiries.value.map((item) => item.id === updated.id ? updated : item);
+    activeInquiry.value = updated;
+    showToast("문의 답변을 완료했습니다.");
+  } catch (error) {
+    console.error("Failed to answer inquiry", error);
+    showToast("문의 답변 저장 실패");
+  } finally {
+    inquirySaving.value = false;
+  }
 }
 
 watch(tab, async (newTab) => {
@@ -202,6 +254,8 @@ watch(tab, async (newTab) => {
     await loadUsers();
   } else if (newTab === 'docs') {
     await loadDocs();
+  } else if (newTab === 'inquiries') {
+    await loadInquiries();
   }
 });
 
@@ -283,6 +337,13 @@ function docLabel(status: string) {
 .doq-api > div { margin-bottom: 10px; padding: 12px 14px; display: flex; align-items: center; justify-content: space-between; border: 1px solid var(--line); border-radius: 12px; }.doq-api > div:last-child { margin-bottom: 0; }.doq-api > div > span { display: grid; }.doq-api strong { font-size: 13.5px; }.doq-api small { margin-top: 2px; color: var(--muted); font-size: 12px; }.doq-api b { padding: 4px 10px; border-radius: 999px; font-size: 11px; }.doq-api b.ok { color: #0c7a68; background: #e7f8f3; }.doq-api b.warn { color: #a9711a; background: #fff6e6; }.doq-api b.bad { color: #c0392b; background: #fdeef0; }
 .doq-admin-table { padding: 22px; }.doq-admin-table > header { margin-bottom: 14px; display: flex; align-items: center; justify-content: space-between; gap: 12px; }.doq-admin-table h2 { font-size: 16px; }.doq-admin-table input, .doq-admin-table select { width: 260px; height: 38px; padding: 0 12px; border: 1px solid var(--line); border-radius: 11px; outline: 0; color: var(--ink); background: var(--soft); font-size: 13px; }.doq-admin-table select { width: auto; background: var(--surface); font-weight: 600; }.doq-table-scroll { overflow-x: auto; }
 .doq-user-row, .doq-doc-admin-row, .doq-inquiry-row { min-width: 720px; padding: 12px 6px; display: grid; align-items: center; gap: 12px; border-top: 1px solid var(--line); font-size: 13px; }.doq-user-row { grid-template-columns: 90px 1.6fr 90px 80px 110px; }.doq-doc-admin-row { grid-template-columns: 90px 1.7fr 90px 80px 100px 60px; }.doq-inquiry-row { grid-template-columns: 90px 1fr 90px 80px 70px; }.doq-table-head { padding-top: 0; border-top: 0; color: var(--muted); font-size: 11.5px; font-weight: 600; }.doq-user-row > span:first-child, .doq-doc-admin-row > span:first-child, .doq-doc-admin-row > span:nth-child(3) { color: var(--muted); font-family: "Space Grotesk", sans-serif; }.doq-user-row > span:nth-child(2), .doq-doc-admin-row > span:nth-child(2) { min-width: 0; display: grid; }.doq-user-row strong, .doq-doc-admin-row strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }.doq-user-row small, .doq-doc-admin-row small { margin-top: 2px; color: var(--muted); font-size: 12px; }.role, .kind { padding: 3px 8px; border-radius: 7px; color: var(--accent-strong); background: var(--soft); font-size: 11px; }.state { padding: 3px 8px; border-radius: 999px; font-size: 11px; }.state.ok { color: #0c7a68; background: #e7f8f3; }.state.warn { color: #a9711a; background: #fff6e6; }.state.bad { color: #c0392b; background: #fdeef0; }.doq-doc-admin-row button, .doq-inquiry-row button { height: 30px; border: 1px solid var(--line); border-radius: 8px; color: var(--accent-strong); background: var(--surface); font-size: 12px; font-weight: 600; cursor: pointer; }.doq-doc-admin-row button:disabled { color: var(--muted); cursor: default; }.waiting { padding: 4px 11px; border-radius: 999px; color: var(--accent-strong); background: var(--soft); font-size: 12px; font-weight: 700; }
+.doq-admin-head p, .doq-admin-metrics span, .doq-trend p span, .doq-trend footer, .doq-api small, .doq-table-head, .doq-user-row small, .doq-doc-admin-row small { color: var(--sub); }
+.doq-admin-head > span { white-space: nowrap; }.doq-admin-head > span.warn i { background: #d4932d; }.doq-admin-head > span.bad i { background: #d0524a; }
+.doq-admin-empty { margin: 12px 0 0; padding: 22px; border: 1px dashed var(--line); border-radius: 12px; color: var(--sub); background: var(--soft); text-align: center; font-size: 13px; }
+.doq-admin-modal-backdrop { position: fixed; inset: 0; z-index: 1400; padding: 20px; display: grid; place-items: center; background: rgb(15 10 40 / .52); }
+.doq-admin-modal { width: min(520px, 100%); padding: 24px; border: 1px solid var(--line); border-radius: 18px; color: var(--ink); background: var(--surface); box-shadow: 0 26px 70px rgb(0 0 0 / .32); }
+.doq-admin-modal > header { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }.doq-admin-modal h2 { margin: 0; font-size: 17px; }.doq-admin-modal header span { display: block; margin-top: 4px; color: var(--sub); font-size: 12px; }.doq-admin-modal header > button { width: 30px; height: 30px; border: 0; border-radius: 8px; color: var(--sub); background: var(--soft); cursor: pointer; }
+.doq-admin-modal > p { margin: 18px 0; padding: 14px; border-radius: 12px; color: var(--sub); background: var(--soft); font-size: 14px; line-height: 1.65; }.doq-admin-modal label { display: grid; gap: 7px; color: var(--sub); font-size: 13px; font-weight: 600; }.doq-admin-modal textarea { min-height: 130px; padding: 12px; border: 1px solid var(--line); border-radius: 12px; color: var(--ink); background: var(--surface); font: inherit; resize: vertical; }.doq-admin-modal footer { margin-top: 18px; display: flex; justify-content: flex-end; gap: 8px; }.doq-admin-modal footer button { height: 40px; padding: 0 15px; border: 1px solid var(--line); border-radius: 10px; color: var(--sub); background: var(--surface); font-weight: 600; cursor: pointer; }.doq-admin-modal footer button:last-child { border: 0; color: #fff; background: var(--accent-gradient); }.doq-admin-modal footer button:disabled { opacity: .5; cursor: default; }
 @media (max-width: 900px) { .doq-admin-metrics { grid-template-columns: repeat(2, 1fr); }.doq-chart-grid { grid-template-columns: 1fr; } }
 @media (max-width: 620px) { .doq-admin { padding: 24px 18px 40px; }.doq-admin-tabs { width: 100%; overflow-x: auto; }.doq-admin-tabs button { white-space: nowrap; flex: 1; padding-inline: 10px; }.doq-admin-table > header { align-items: stretch; flex-direction: column; }.doq-admin-table input { width: 100%; } }
 </style>

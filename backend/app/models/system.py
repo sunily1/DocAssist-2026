@@ -31,9 +31,12 @@ class SupportTicket(Base):
     type: Mapped[str] = mapped_column(String(50), nullable=False) # 'INQUIRY', 'REPORT' 유형
     subject: Mapped[str] = mapped_column(String(255), nullable=False)
     content: Mapped[str] = mapped_column(Text, nullable=False)
+    reply_email: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    response: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     status: Mapped[TicketStatus] = mapped_column(SAEnum(TicketStatus), default=TicketStatus.OPEN)
     priority: Mapped[TicketPriority] = mapped_column(SAEnum(TicketPriority), default=TicketPriority.MEDIUM)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
     resolved_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
 
     user: Mapped["User"] = relationship("User", back_populates="support_tickets")

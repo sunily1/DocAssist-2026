@@ -16,9 +16,6 @@
       <button class="sb-item" :class="{ active: currentRouteName === 'drive' }" @click="navigate('drive')">
         <FolderOpen :size="19" /><span>드라이브</span>
       </button>
-      <button class="sb-item" :class="{ active: currentRouteName === 'documentView' }" @click="navigateDocument">
-        <FileText :size="19" /><span>문서 보기</span>
-      </button>
       <button class="sb-item" :class="{ active: currentRouteName === 'qa' }" @click="navigate('qa')">
         <MessageSquareText :size="19" /><span>Q&amp;A</span>
       </button>
@@ -59,7 +56,6 @@ import { useRouter, useRoute } from "vue-router";
 import {
   BookOpen,
   FolderOpen,
-  FileText,
   House,
   LogOut,
   MessageSquareText,
@@ -87,13 +83,6 @@ function navigate(name: string) {
   router.push({ name }).catch(() => {});
 }
 
-function navigateDocument() {
-  emit("close");
-  const currentId = String(route.params.id || localStorage.getItem("last_document_id") || "");
-  if (currentId) router.push({ name: "documentView", params: { id: currentId } }).catch(() => {});
-  else router.push({ name: "drive" }).catch(() => {});
-}
-
 function handleLogout() {
   emit("close");
   authStore.logout();
@@ -103,8 +92,6 @@ function handleLogout() {
 
 <style scoped>
 .sidebar {
-  position: sticky;
-  top: 0;
   width: 244px;
   height: 100vh;
   padding: 20px 16px;
@@ -117,9 +104,9 @@ function handleLogout() {
 }
 
 .brand {
-  width: fit-content;
-  margin: 0 8px 24px;
-  padding: 0;
+  width: 100%;
+  margin: 0;
+  padding: 6px 8px 22px;
   display: inline-flex;
   align-items: center;
   gap: 11px;
@@ -141,9 +128,11 @@ function handleLogout() {
 }
 
 .brand-name {
+  color: var(--sidebar-fg);
   font-family: "Space Grotesk", "IBM Plex Sans KR", sans-serif;
   font-size: 21px;
   font-weight: 700;
+  letter-spacing: .02em;
 }
 
 .nav-label {
@@ -157,12 +146,11 @@ function handleLogout() {
 
 .sb-item {
   width: 100%;
-  min-height: 42px;
   padding: 10px 12px;
   display: flex;
   align-items: center;
   gap: 11px;
-  border: 1px solid transparent;
+  border: 0;
   border-radius: 12px;
   color: var(--sidebar-fg);
   background: transparent;
@@ -173,19 +161,19 @@ function handleLogout() {
   transition: color .18s ease, background .18s ease, border-color .18s ease;
 }
 
-.sb-item:hover { color: var(--ink); background: var(--soft); }
+.sb-item:hover { background: #f4f2fd; }
+[data-theme="dark"] .sb-item:hover { background: rgb(255 255 255 / .06); }
 .sb-item.active {
   color: var(--accent-strong);
   font-weight: 600;
   background: var(--accent-soft);
-  border-color: var(--accent-border);
 }
 
 .sb-sep { height: 1px; margin: 14px 6px; background: var(--line); }
 
 .account-card {
   margin-top: auto;
-  padding: 13px;
+  padding: 14px;
   border: 1px solid var(--line);
   border-radius: 15px;
   background: var(--soft);
@@ -228,7 +216,6 @@ function handleLogout() {
 
 @media (max-width: 820px) {
   .sidebar {
-    position: sticky;
     width: 66px;
     padding-left: 10px;
     padding-right: 10px;

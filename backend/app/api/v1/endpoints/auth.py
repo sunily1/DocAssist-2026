@@ -19,20 +19,12 @@ async def login(
     form_data: OAuth2PasswordRequestForm = Depends()
 ) -> Any:
     """로그인 처리: 비밀번호 검증 후 JWT 발급."""
-    # 디버그 로그
-    print(f"DEBUG: db session type: {type(db)}")
-    
     user = await user_service.get_by_email(db, email=form_data.username)
-    
-    # 디버그 로그
-    print(f"DEBUG: user type: {type(user)}")
-    if user:
-        print(f"DEBUG: user repr: {user}")
-    
+
     if not user:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Incorrect email or password",
+            detail="이메일 또는 비밀번호가 올바르지 않습니다.",
         )
     
     # 안전한 접근(딕셔너리/객체 모두 대응)
@@ -48,10 +40,10 @@ async def login(
     if not security.verify_password(form_data.password, password_hash):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Incorrect email or password",
+            detail="이메일 또는 비밀번호가 올바르지 않습니다.",
         )
     elif not is_active:
-        raise HTTPException(status_code=400, detail="Inactive user")
+        raise HTTPException(status_code=400, detail="비활성화된 계정입니다.")
     
     if not isinstance(user, dict):
         now = datetime.now(timezone.utc)

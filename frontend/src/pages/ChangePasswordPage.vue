@@ -89,7 +89,9 @@ async function submit() {
     router.push({ name: "profile" });
   } catch (error: any) {
     if (error.response?.data?.detail) {
-      errorMsg.value = error.response.data.detail;
+      errorMsg.value = error.response.data.detail === "Incorrect password"
+        ? "현재 비밀번호가 올바르지 않습니다."
+        : error.response.data.detail;
     } else {
       errorMsg.value = "비밀번호 변경에 실패했습니다. 현재 비밀번호를 확인해주세요.";
     }

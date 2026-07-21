@@ -7,6 +7,7 @@ from sqlalchemy.future import select
 from sqlalchemy import desc
 
 from app.models.chat import ChatSession, ChatMessage, ChatRole
+from app.models.document import DocStatus, Document
 from app.schemas.chat import ChatSessionCreate, ChatMessageCreate
 from app.services.rag_service import rag_service
 
@@ -14,6 +15,20 @@ async def create_session(
     db: AsyncSession, user_id: UUID, obj_in: ChatSessionCreate
 ) -> ChatSession:
     """채팅 세션 생성."""
+    if obj_in.document_id:
+        result = await db.execute(
+            select(Document).filter(
+                Document.id == obj_in.document_id,
+                Document.user_id == user_id,
+                Document.deleted_at == None,
+            )
+        )
+        document = result.scalars().first()
+        if not document:
+            raise ValueError("선택한 문서를 찾을 수 없습니다.")
+        if document.status != DocStatus.DONE:
+            raise ValueError("문서 분석이 완료된 후 질문할 수 있습니다.")
+
     db_obj = ChatSession(
         user_id=user_id,
         document_id=obj_in.document_id,
@@ -89,6 +104,21 @@ async def process_question(
     """
     사용자 질문 처리: 저장 → 컨텍스트 검색 → 응답 생성 → 저장.
     """
+    session = await get_session(db, session_id)
+    if not session:
+        raise ValueError("대화 세션을 찾을 수 없습니다.")
+
+    if session.document_id:
+        result = await db.execute(
+            select(Document).filter(
+                Document.id == session.document_id,
+                Document.deleted_at == None,
+            )
+        )
+        document = result.scalars().first()
+        if not document or document.status != DocStatus.DONE:
+            raise ValueError("문서 분석이 완료된 후 질문할 수 있습니다.")
+
     # 1. 사용자 메시지 저장
     user_msg_in = ChatMessageCreate(role=ChatRole.USER, content=question)
     await create_message(db, session_id, user_msg_in)
@@ -103,8 +133,6 @@ async def process_question(
     llm_messages = [{"role": get_role_value(msg.role), "content": msg.content} for msg in previous_messages]
     
     # 3. 세션 정보 조회(문서 연결 확인)
-    session = await get_session(db, session_id)
-    
     # 4. RAG 서비스 호출
     response_in = await rag_service.get_chat_completion(
         db=db,

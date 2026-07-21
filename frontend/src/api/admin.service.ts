@@ -29,6 +29,7 @@ export interface AdminMetrics {
   satisfaction: MetricSlice[];
   devices: MetricSlice[];
   apiStatus: Record<string, ApiStatusItem>;
+  trend: Array<{ date: string; label: string; signups: number; conversions: number }>;
 }
 
 export interface UserItem {
@@ -49,6 +50,20 @@ export interface DocItem {
   user_id: string;
 }
 
+export interface InquiryItem {
+  id: string;
+  type: string;
+  subject: string;
+  content: string;
+  reply_email?: string;
+  response?: string;
+  status: "OPEN" | "IN_PROGRESS" | "RESOLVED";
+  sender_name: string;
+  sender_email: string;
+  created_at: string;
+  resolved_at?: string;
+}
+
 export default {
   async getMetrics(): Promise<{ data: AdminMetrics }> {
     return api.get('/admin/metrics');
@@ -60,5 +75,11 @@ export default {
   
   async getDocuments(params?: { skip?: number; limit?: number }) {
       return api.get<DocItem[]>('/admin/documents', { params });
-  }
+  },
+  async getInquiries() {
+    return api.get<InquiryItem[]>('/admin/inquiries');
+  },
+  async answerInquiry(id: string, response: string) {
+    return api.patch<InquiryItem>(`/admin/inquiries/${id}/answer`, { response });
+  },
 };

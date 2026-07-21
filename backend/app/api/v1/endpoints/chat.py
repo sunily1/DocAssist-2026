@@ -18,7 +18,10 @@ async def create_session(
     db: AsyncSession = Depends(deps.get_db)
 ) -> Any:
     """채팅 세션 생성(문서 선택적 연결)."""
-    session = await chat_service.create_session(db, current_user.id, session_in)
+    try:
+        session = await chat_service.create_session(db, current_user.id, session_in)
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
     return session
 
 @router.get("/sessions", response_model=List[ChatSessionRead])
@@ -64,11 +67,14 @@ async def ask_question(
     # 2. 질문 처리 위임
     user_settings = getattr(current_user, 'profile_settings', {})
     
-    assistant_message = await chat_service.process_question(
-        db=db,
-        session_id=session_id,
-        question=chat_question.question,
-        user_settings=user_settings
-    )
+    try:
+        assistant_message = await chat_service.process_question(
+            db=db,
+            session_id=session_id,
+            question=chat_question.question,
+            user_settings=user_settings
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
 
     return assistant_message

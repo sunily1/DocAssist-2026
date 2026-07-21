@@ -83,6 +83,19 @@ async def create_with_file(
         shutil.copyfileobj(file.file, buffer)
 
     file_size = os.path.getsize(file_path)
+    if file_size == 0:
+        os.remove(file_path)
+        raise HTTPException(status_code=400, detail="빈 파일은 업로드할 수 없습니다.")
+
+    try:
+        extracted_text = processor.extract_text(file_path, file_ext.replace(".", "").upper())
+    except Exception as exc:
+        os.remove(file_path)
+        raise HTTPException(status_code=400, detail="파일에서 읽을 수 있는 텍스트를 찾지 못했습니다.") from exc
+    if not str(extracted_text or "").strip():
+        os.remove(file_path)
+        raise HTTPException(status_code=400, detail="파일에서 읽을 수 있는 텍스트를 찾지 못했습니다.")
+
     normalized_intensity = normalize_intensity(intensity)
 
     db_obj = Document(
@@ -303,6 +316,25 @@ def build_layout_pdf_bytes(document: Document) -> bytes:
     return processor.build_layout_preserved_pdf(
         document.s3_key,
         document.analysis.paragraphs or [],
+    )
+
+
+def build_pdf_annotations(document: Document, mode: str = "converted") -> list[dict[str, Any]]:
+    """원본 또는 쉬운말 PDF 위에 표시할 변경 표현 좌표를 생성합니다."""
+    if str(document.file_type or "").upper() != "PDF":
+        raise HTTPException(status_code=400, detail="PDF 문서에서만 좌표 하이라이트를 사용할 수 있습니다.")
+    if not document.analysis:
+        raise HTTPException(status_code=409, detail="문서 분석이 아직 완료되지 않았습니다.")
+    if not document.s3_key or not os.path.exists(document.s3_key):
+        raise HTTPException(status_code=404, detail="원본 PDF 파일을 찾을 수 없습니다.")
+
+    normalized_mode = "original" if mode == "original" else "converted"
+    converted_pdf = build_layout_pdf_bytes(document) if normalized_mode == "converted" else None
+    return processor.build_pdf_change_annotations(
+        document.s3_key,
+        document.analysis.paragraphs or [],
+        mode=normalized_mode,
+        converted_pdf=converted_pdf,
     )
 
 

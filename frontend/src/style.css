@@ -2,7 +2,7 @@
 
 :root {
   color-scheme: light;
-  --base-font-size: 16px;
+  --reader-font-size: 16.5px;
   --bg: #f3f2f8;
   --bg-color: #f3f2f8;
   --card: #ffffff;
@@ -55,38 +55,34 @@
   --ink: #f4f2f8;
   --text-primary: #f4f2f8;
   --sub: #d7d4e2;
-  --muted: #a9a4b9;
-  --text-secondary: #a9a4b9;
-  --line: #343140;
-  --border-color: #343140;
-  --field-bg: #26232f;
+  --muted: #948fa6;
+  --text-secondary: #948fa6;
+  --line: #302d3b;
+  --border-color: #302d3b;
+  --field-bg: #272430;
   --field-text: #f4f2f8;
-  --field-border: #403b4c;
+  --field-border: #302d3b;
   --button-bg: #292633;
   --button-text: #f4f2f8;
   --button-hover: #302c3b;
-  --accent: #8c74ff;
-  --primary-color: #8c74ff;
-  --accent-strong: #b8aaff;
-  --accent-2: #6d84ff;
-  --secondary-color: #6d84ff;
-  --accent-gradient: linear-gradient(135deg, #7c5cff, #576fff);
-  --accent-soft: rgb(140 116 255 / .16);
-  --accent-border: rgb(140 116 255 / .34);
+  --accent: #6a4dff;
+  --primary-color: #6a4dff;
+  --accent-strong: #5638e0;
+  --accent-2: #4e6bff;
+  --secondary-color: #4e6bff;
+  --accent-gradient: linear-gradient(135deg, #6a4dff, #4e6bff);
+  --accent-soft: rgb(255 255 255 / .09);
+  --accent-border: transparent;
   --success-color: #37c8aa;
   --warning-color: #f0b85a;
   --danger-color: #ff7890;
   --sidebar-bg: #17151f;
-  --sidebar-fg: #aaa6b8;
-  --sidebar-muted: #777283;
+  --sidebar-fg: #a8a4b8;
+  --sidebar-muted: #6f6b80;
   --topbar-bg: rgb(23 21 31 / .92);
   --shadow: 0 14px 34px rgb(0 0 0 / .2);
   --shadow-lg: 0 24px 60px rgb(0 0 0 / .34);
 }
-
-:root[data-size="sm"] { --base-font-size: 14px; }
-:root[data-size="md"] { --base-font-size: 16px; }
-:root[data-size="lg"] { --base-font-size: 18px; }
 
 * { box-sizing: border-box; }
 html, body { margin: 0; min-height: 100%; }
@@ -94,27 +90,12 @@ body {
   background: var(--bg);
   color: var(--ink);
   font-family: "IBM Plex Sans KR", system-ui, sans-serif;
-  font-size: var(--base-font-size);
+  font-size: 16px;
   -webkit-font-smoothing: antialiased;
 }
 button, input, select, textarea { font: inherit; letter-spacing: 0; }
 button { color: inherit; }
 ::selection { background: rgb(124 92 255 / .22); }
-
-body.font-size-sm { --app-title-size: 15px; --app-body-size: 13px; --app-control-size: 13px; --app-small-size: 11px; }
-body.font-size-md { --app-title-size: 16px; --app-body-size: 14px; --app-control-size: 14px; --app-small-size: 12px; }
-body.font-size-lg { --app-title-size: 18px; --app-body-size: 16px; --app-control-size: 16px; --app-small-size: 14px; }
-body.font-size-custom {
-  --app-title-size: var(--custom-title-size, 18px);
-  --app-body-size: var(--custom-body-size, 16px);
-  --app-control-size: var(--custom-control-size, 16px);
-  --app-small-size: var(--custom-small-size, 14px);
-}
-
-body[class*="font-size-"] :where(.tb-title-strong, .card-head h2, .qa-title, .term-title, .block-title, .detail-title .big, .name, .title, h2) { font-size: var(--app-title-size) !important; }
-body[class*="font-size-"] :where(.text p, .block-text, .evid-text, .ev-body, .pin-text, .empty, .help, .foot-muted, .email, .meta-line, .form, .field) { font-size: var(--app-body-size) !important; }
-body[class*="font-size-"] :where(button, input, select, textarea, .btn, .input, .select, .doc-select, .seg-btn) { font-size: var(--app-control-size) !important; }
-body[class*="font-size-"] :where(.muted, .small, .tb-sub, .label, .badge, .tag, .who, .pill, .link, .cite-title, .cite-chip) { font-size: var(--app-small-size) !important; }
 
 #app .app .topbar {
   min-height: 72px;

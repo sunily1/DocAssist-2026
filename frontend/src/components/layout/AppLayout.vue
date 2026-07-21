@@ -54,19 +54,21 @@ function closeSidebar() {
 
 <style scoped>
 .app {
-  min-height: 100vh;
+  height: 100vh;
   display: grid;
   grid-template-columns: 244px minmax(0, 1fr);
+  overflow: hidden;
   font-family: "IBM Plex Sans KR", system-ui, sans-serif;
   color: var(--ink);
   background: var(--bg);
 }
 
 .main {
-  display: grid;
-  grid-template-rows: auto minmax(0, 1fr);
-  min-height: 100vh;
+  height: 100vh;
   min-width: 0;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: #d8d5e6 transparent;
 }
 
 /* Mobile responsive */

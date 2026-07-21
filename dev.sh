@@ -35,6 +35,7 @@ if [ -d "venv" ]; then
         echo "오류: uvicorn이 설치되어 있지 않습니다. (backend/requirements.txt 설치 필요)"
         exit 1
     fi
+    alembic upgrade head || exit 1
     WATCHFILES_FORCE_POLLING=1 uvicorn app.main:app --reload --host 0.0.0.0 --port 8000 > ../backend.log 2>&1 &
     BACKEND_PID=$!
     echo -e "${GREEN}[Backend] PID: $BACKEND_PID${NC}"

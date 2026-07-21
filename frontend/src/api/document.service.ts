@@ -59,6 +59,11 @@ export default {
       responseType: 'blob',
     });
   },
+  getDocumentAnnotations(id: string, mode: 'converted' | 'original' = 'converted') {
+    return api.get(`/documents/${id}/annotations`, {
+      params: { mode },
+    });
+  },
   deleteDocument(id: string) {
     return api.delete(`/documents/${id}`);
   },
