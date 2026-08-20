@@ -6,7 +6,7 @@ import re
 from collections import OrderedDict
 from typing import Any
 
-from app.services.corpus_difficulty import get_term_difficulty, get_term_frequency
+from app.services.corpus_difficulty import get_term_difficulty
 
 
 INTENSITY_LABELS = {
@@ -259,13 +259,11 @@ def apply_easy_terms(text: str, intensity: str | None = "easy") -> tuple[str, li
         if term in converted:
             converted, replacements = _replace_easy_term(converted, term, replacement)
             for source, target in replacements:
-                frequency = get_term_frequency(term)
                 item = {
                     "from": source,
                     "to": target,
                     "definition": definition,
                     "difficulty": difficulty,
-                    "frequency_per_million": frequency.get("frequency_per_million") if frequency else None,
                 }
                 if item not in changed:
                     changed.append(item)
