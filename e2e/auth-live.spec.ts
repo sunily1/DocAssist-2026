@@ -35,9 +35,6 @@ test.describe('live authentication UI', () => {
     await expect(page.getByRole('alert')).toContainText('이메일 또는 비밀번호가 올바르지 않습니다.');
     await expect(page.getByRole('button', { name: '로그인', exact: true })).toBeEnabled();
 
-    await page.getByRole('button', { name: 'Google로 계속하기' }).click();
-    await expect(page.getByRole('alert')).toContainText('Google 로그인은 아직 연결되지 않았습니다.');
-
     await page.getByRole('button', { name: '회원가입' }).click();
     await expect(page).toHaveURL(/\/signup$/);
     await page.locator('input[autocomplete="name"]').fill('인증 기능 테스트');

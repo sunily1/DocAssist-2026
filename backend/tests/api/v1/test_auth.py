@@ -1,5 +1,7 @@
 import pytest
+from urllib.parse import parse_qs, urlparse
 from httpx import AsyncClient
+from app.api.v1.endpoints import auth as auth_endpoints
 from app.core.config import settings
 
 @pytest.mark.asyncio
@@ -37,7 +39,7 @@ async def test_signup_duplicate_email(client: AsyncClient):
 
     # Then
     assert response.status_code == 400
-    assert "already exists" in response.json()["detail"]
+    assert response.json()["detail"] == "이미 가입된 이메일입니다."
 
 @pytest.mark.asyncio
 async def test_login(client: AsyncClient):
@@ -63,3 +65,53 @@ async def test_login(client: AsyncClient):
     assert "access_token" in data
     assert data["token_type"] == "bearer"
 
+
+@pytest.mark.asyncio
+async def test_password_reset_uses_emailed_one_time_token(client: AsyncClient, monkeypatch):
+    email = "password-reset@example.com"
+    old_password = "old-password-123"
+    new_password = "new-password-456"
+    await client.post(
+        f"{settings.API_V1_STR}/auth/signup",
+        json={"email": email, "password": old_password, "name": "Reset User"},
+    )
+
+    monkeypatch.setattr(settings, "SMTP_HOST", "smtp.example.com")
+    monkeypatch.setattr(settings, "SMTP_FROM_EMAIL", "no-reply@example.com")
+    captured: dict[str, str] = {}
+
+    async def fake_send(recipient: str, reset_url: str) -> None:
+        captured["recipient"] = recipient
+        captured["url"] = reset_url
+
+    monkeypatch.setattr(auth_endpoints, "send_password_reset_email", fake_send)
+    request_response = await client.post(
+        f"{settings.API_V1_STR}/auth/forgot-password",
+        json={"email": email},
+    )
+
+    assert request_response.status_code == 200
+    assert captured["recipient"] == email
+    token = parse_qs(urlparse(captured["url"]).query)["token"][0]
+    reset_response = await client.post(
+        f"{settings.API_V1_STR}/auth/reset-password",
+        json={"token": token, "password": new_password},
+    )
+    assert reset_response.status_code == 200
+
+    old_login = await client.post(
+        f"{settings.API_V1_STR}/auth/login",
+        data={"username": email, "password": old_password},
+    )
+    new_login = await client.post(
+        f"{settings.API_V1_STR}/auth/login",
+        data={"username": email, "password": new_password},
+    )
+    reused_token = await client.post(
+        f"{settings.API_V1_STR}/auth/reset-password",
+        json={"token": token, "password": "another-password-789"},
+    )
+
+    assert old_login.status_code == 400
+    assert new_login.status_code == 200
+    assert reused_token.status_code == 400

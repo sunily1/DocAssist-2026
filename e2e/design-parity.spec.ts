@@ -54,6 +54,12 @@ async function mockApi(page: Page) {
     if (path === '/users/me' && (method === 'GET' || method === 'PATCH')) return route.fulfill({ json: user });
     if (path === '/users/me/presence') return route.fulfill({ json: { ok: true } });
     if (path === '/users/me/feedback') return route.fulfill({ json: { rating: 'satisfied' } });
+    if (path === '/auth/forgot-password' && method === 'POST') return route.fulfill({ json: {
+      message: '가입된 이메일이라면 비밀번호 재설정 링크를 전송했습니다.',
+    } });
+    if (path === '/auth/reset-password' && method === 'POST') return route.fulfill({ json: {
+      message: '비밀번호가 변경되었습니다. 새 비밀번호로 로그인해 주세요.',
+    } });
     if (path === '/documents/convert-text' && method === 'POST' && request.postData()?.includes('이미 쉬운 문장')) return route.fulfill({ json: {
       summary: '이미 쉬운 문장입니다.', converted_text: '이미 쉬운 문장입니다.',
       paragraphs: [{ original: '이미 쉬운 문장입니다.', easy: '이미 쉬운 문장입니다.', changed_terms: [] }],
@@ -309,4 +315,38 @@ test('Q&A starts with direct questions and can clear the current conversation', 
   page.once('dialog', (dialog) => dialog.accept());
   await page.getByRole('button', { name: '대화 지우기' }).click();
   await expect(page.getByRole('status')).toContainText('대화 내용을 지웠습니다.');
+});
+
+test('password recovery calls the backend instead of showing a mock success', async ({ page }) => {
+  await page.route('**/api/v1/auth/forgot-password', (route) => route.fulfill({ json: {
+    message: '가입된 이메일이라면 비밀번호 재설정 링크를 전송했습니다.',
+  } }));
+  await page.route('**/api/v1/auth/reset-password', (route) => route.fulfill({ json: {
+    message: '비밀번호가 변경되었습니다. 새 비밀번호로 로그인해 주세요.',
+  } }));
+  await page.goto('http://localhost:3000/forgot-password');
+  await page.locator('input[autocomplete="email"]').fill('user@example.com');
+  const forgotRequest = page.waitForRequest((request) =>
+    request.url().includes('/auth/forgot-password') && request.method() === 'POST',
+  );
+  await page.getByRole('button', { name: '재설정 링크 보내기' }).click();
+  expect((await forgotRequest).postDataJSON()).toEqual({ email: 'user@example.com' });
+  await expect(page.locator('.info')).toContainText('가입된 이메일이라면');
+
+  await page.goto('http://localhost:3000/reset-password?token=valid-reset-token-1234567890');
+  await page.locator('input[autocomplete="new-password"]').nth(0).fill('NewPassword!2026');
+  await page.locator('input[autocomplete="new-password"]').nth(1).fill('NewPassword!2026');
+  const resetRequest = page.waitForRequest((request) =>
+    request.url().includes('/auth/reset-password') && request.method() === 'POST',
+  );
+  await page.getByRole('button', { name: '비밀번호 변경' }).click();
+  expect((await resetRequest).postDataJSON()).toEqual({
+    token: 'valid-reset-token-1234567890',
+    password: 'NewPassword!2026',
+  });
+  await expect(page.locator('.success')).toContainText('비밀번호가 변경되었습니다');
+
+  await page.goto('http://localhost:3000/reset-password');
+  await expect(page.getByRole('button', { name: '비밀번호 변경' })).toBeDisabled();
+  await expect(page.locator('.error')).toContainText('재설정 토큰이 없습니다');
 });

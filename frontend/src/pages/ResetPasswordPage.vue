@@ -1,4 +1,4 @@
-﻿<!-- 인수인계용: 비밀번호 재설정 입력 화면(현재 Mock) -->
+﻿<!-- 비밀번호 재설정 입력 화면 -->
 <template>
     <div class="page">
       <div class="shell">
@@ -21,11 +21,7 @@
         <!-- 오른쪽 영역 -->
         <section class="right">
           <h1 class="title">Reset Password</h1>
-          <p class="desc">
-            새 비밀번호를 입력하세요.
-            <span v-if="token" class="token-pill">token OK</span>
-            <span v-else class="token-pill warn">token missing</span>
-          </p>
+          <p class="desc">새 비밀번호를 입력하세요.</p>
   
           <form class="form" @submit.prevent="onSubmit">
             <label class="field">
@@ -65,11 +61,11 @@
             </label>
   
             <button class="btn" type="submit" :disabled="loading || !token">
-              {{ loading ? "Updating..." : "Update password" }}
+              {{ loading ? "변경 중..." : "비밀번호 변경" }}
             </button>
   
             <div v-if="success" class="success">
-              ✅ 비밀번호가 변경되었어요. 이제 로그인 해주세요.
+              비밀번호가 변경되었습니다. 로그인 화면으로 이동합니다.
             </div>
   
             <div v-if="error" class="error">{{ error }}</div>
@@ -86,8 +82,9 @@
   </template>
   
   <script setup lang="ts">
-  import { computed, ref } from "vue";
+  import { computed, onMounted, ref } from "vue";
   import { useRoute, useRouter } from "vue-router";
+  import api from "../api/axios";
   
   const router = useRouter();
   const route = useRoute();
@@ -108,6 +105,10 @@
   function goLogin() {
     router.push({ name: "login" }).catch(() => {});
   }
+
+  onMounted(() => {
+    if (!token.value) error.value = "재설정 토큰이 없습니다. 이메일의 링크를 다시 확인해 주세요.";
+  });
   
   async function onSubmit() {
     error.value = "";
@@ -119,15 +120,16 @@
       if (newPassword.value.length < 8) throw new Error("비밀번호는 8자 이상이어야 해요.");
       if (newPassword.value !== confirm.value) throw new Error("비밀번호가 서로 달라요.");
   
-      // 할일: FastAPI 연결
-      // POST /auth/reset-password { token: token.value, password: newPassword.value }
-  
+      await api.post("/auth/reset-password", {
+        token: token.value,
+        password: newPassword.value,
+      });
       success.value = true;
   
       // 사용자 경험(UX): 성공 후 1.2초 뒤 로그인 화면으로
       setTimeout(() => goLogin(), 1200);
     } catch (e: any) {
-      error.value = e?.message ?? "비밀번호 변경에 실패했어요.";
+      error.value = e.response?.data?.detail || e?.message || "비밀번호 변경에 실패했어요.";
     } finally {
       loading.value = false;
     }
@@ -332,7 +334,6 @@
   }
   </style>
   
-
 
 
 

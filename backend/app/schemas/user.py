@@ -2,7 +2,7 @@
 
 from typing import Literal, Optional
 from datetime import datetime
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, Field
 from uuid import UUID
 
 from app.models.user import UserRole
@@ -17,7 +17,7 @@ class UserBase(BaseModel):
 # 생성 요청 필드
 class UserCreate(UserBase):
     """회원가입 요청 스키마."""
-    password: str
+    password: str = Field(min_length=8)
 
 # 수정 요청 필드
 class UserUpdate(BaseModel):
@@ -29,7 +29,20 @@ class UserUpdate(BaseModel):
 class UserPasswordChange(BaseModel):
     """비밀번호 변경 요청 스키마."""
     current_password: str
-    new_password: str
+    new_password: str = Field(min_length=8)
+
+
+class PasswordResetRequest(BaseModel):
+    email: EmailStr
+
+
+class PasswordResetConfirm(BaseModel):
+    token: str = Field(min_length=20)
+    password: str = Field(min_length=8)
+
+
+class MessageRead(BaseModel):
+    message: str
 
 class UserInDBBase(UserBase):
     """DB 공통 필드 포함 스키마."""

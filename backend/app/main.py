@@ -18,6 +18,8 @@ logger = logging.getLogger(__name__)
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """앱 시작/종료 시 DB 초기화 등 공통 작업을 처리."""
+    if len(settings.SECRET_KEY) < 32:
+        raise RuntimeError("SECRET_KEY must be configured with at least 32 characters")
     # 시작 시 초기화
     logger.info("Initializing database...")
     async with SessionLocal() as db:

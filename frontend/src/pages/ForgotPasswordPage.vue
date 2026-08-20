@@ -1,4 +1,4 @@
-﻿<!-- 인수인계용: 비밀번호 재설정 안내/요청 화면(현재 Mock) -->
+﻿<!-- 비밀번호 재설정 메일 요청 화면 -->
 <template>
   <div class="wrap">
     <div class="shell">
@@ -59,6 +59,9 @@
             <div v-if="info" class="info">
               {{ info }}
             </div>
+            <div v-if="error" class="error" role="alert">
+              {{ error }}
+            </div>
 
             <div class="row">
               <button class="link" type="button" @click="goLogin">로그인</button>
@@ -75,12 +78,14 @@
 <script setup lang="ts">
 import { ref } from "vue";
 import { useRouter } from "vue-router";
+import api from "../api/axios";
 
 const router = useRouter();
 
 const email = ref("");
 const loading = ref(false);
 const info = ref("");
+const error = ref("");
 
 function goHome() {
   router.push({ name: "home" }).catch(() => {});
@@ -94,14 +99,14 @@ function goSignup() {
 
 async function submit() {
   info.value = "";
+  error.value = "";
   loading.value = true;
 
   try {
-    // 실제로는 FastAPI 호출로 교체
-    // await fetch("/api/auth/forgot-password", { method:"POST", body: JSON.stringify({ email: email.value }) })
-    await new Promise((r) => setTimeout(r, 700));
-
-    info.value = "재설정 링크를 전송했어요. 메일함을 확인해 주세요.";
+    const response = await api.post("/auth/forgot-password", { email: email.value });
+    info.value = response.data?.message || "가입된 이메일이라면 재설정 링크를 전송했습니다.";
+  } catch (cause: any) {
+    error.value = cause.response?.data?.detail || "재설정 메일 요청에 실패했습니다. 잠시 후 다시 시도해 주세요.";
   } finally {
     loading.value = false;
   }
@@ -255,6 +260,16 @@ async function submit() {
   font-size: 12px;
 }
 
+.error {
+  border: 1px solid rgb(220 75 103 / 22%);
+  background: rgb(220 75 103 / 8%);
+  color: #b92e4b;
+  padding: 10px 12px;
+  border-radius: 12px;
+  font-weight: 800;
+  font-size: 12px;
+}
+
 .row {
   display: flex;
   justify-content: center;
@@ -284,7 +299,6 @@ async function submit() {
   .blob { display: none; }
 }
 </style>
-
 
 
 

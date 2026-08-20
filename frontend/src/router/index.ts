@@ -18,7 +18,7 @@ import ChangePasswordPage from "@/pages/ChangePasswordPage.vue";
 type Role = "USER" | "ADMIN";
 
 /**
- * 🔐 인증 정보 읽기 (데모 기준)
+ * 인증 정보 읽기
  */
 function getAuth() {
   const persistentToken = localStorage.getItem("token");

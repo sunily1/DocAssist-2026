@@ -60,8 +60,6 @@
           </button>
         </form>
 
-        <div class="or"><span></span>또는<span></span></div>
-        <button class="google" type="button" @click="errorMsg = 'Google 로그인은 아직 연결되지 않았습니다.'">Google로 계속하기</button>
         <p class="signup-copy">아직 계정이 없으신가요? <button type="button" @click="goSignup">회원가입</button></p>
       </div>
     </section>

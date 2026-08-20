@@ -37,10 +37,21 @@ class Settings(BaseSettings):
     """프로젝트 전역 설정(환경 변수 기반)."""
     PROJECT_NAME: str = "DocAssist"
     API_V1_STR: str = "/api/v1"
-    SECRET_KEY: str = "secret"
+    SECRET_KEY: str = ""
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
     CORS_ORIGINS: str = "http://localhost:3000"
+    FRONTEND_URL: str = "http://localhost:3000"
+
+    # Password reset email
+    PASSWORD_RESET_EXPIRE_MINUTES: int = 30
+    SMTP_HOST: str = ""
+    SMTP_PORT: int = 587
+    SMTP_USERNAME: str = ""
+    SMTP_PASSWORD: str = ""
+    SMTP_FROM_EMAIL: str = ""
+    SMTP_STARTTLS: bool = True
+    SMTP_USE_SSL: bool = False
 
     # Initial administrator. Set only in the local/server .env file.
     INITIAL_ADMIN_EMAIL: str = os.getenv("INITIAL_ADMIN_EMAIL", "").strip()
@@ -71,5 +82,9 @@ class Settings(BaseSettings):
     @property
     def cors_origins(self) -> list[str]:
         return [origin.strip() for origin in self.CORS_ORIGINS.split(",") if origin.strip()]
+
+    @property
+    def smtp_configured(self) -> bool:
+        return bool(self.SMTP_HOST.strip() and self.SMTP_FROM_EMAIL.strip())
 
 settings = Settings()
