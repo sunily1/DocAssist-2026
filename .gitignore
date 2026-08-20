@@ -51,6 +51,12 @@ frontend/test-results/
 backend/uploads/
 frontend/public/pdfjs/
 
+# Locally generated corpus statistics (source corpora and derivatives are not published)
+backend/app/data/nikl_term_frequency.json
+backend/app/data/nikl_*.json
+*.corpus.zip
+NIKL_*.zip
+
 # Imported dependencies and OS archive metadata
 frontend/node_modules*/
 __MACOSX/

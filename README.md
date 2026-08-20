@@ -26,7 +26,7 @@ Browser (Vue 3 + TypeScript + Vite)
 
 - `frontend/`: 사용자 화면과 PDF·DOCX 뷰어
 - `backend/`: API, 인증, 문서 처리, RAG, 관리자 통계
-- `backend/app/data/nikl_term_frequency.json`: 원문 말뭉치 없이 배포 가능한 집계 빈도
+- `backend/app/data/nikl_term_frequency.json`: 로컬에서만 생성하는 말뭉치 집계 빈도(Git 제외)
 - `backend/scripts/build_corpus_frequency.py`: 국립국어원 ZIP에서 빈도를 다시 만드는 도구
 - `e2e/`: Playwright 화면·기능 테스트
 
@@ -56,7 +56,7 @@ cd ..
 
 ## 말뭉치 난이도 재생성
 
-저장소에는 국립국어원 원본 ZIP을 포함하지 않습니다. 형태 분석 말뭉치와 일상 대화 말뭉치를 내려받은 뒤 다음 명령으로 집계 파일만 갱신합니다.
+저장소에는 국립국어원 원본 ZIP과 그 가공·집계 데이터를 포함하지 않습니다. 이용 허가를 받은 사용자가 형태 분석 말뭉치와 일상 대화 말뭉치를 로컬에 내려받은 뒤 다음 명령으로 집계 파일을 생성합니다. 생성된 JSON은 `.gitignore`로 Git에서 제외됩니다.
 
 ```bash
 cd backend

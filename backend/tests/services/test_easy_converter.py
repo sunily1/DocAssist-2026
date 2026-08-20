@@ -1,3 +1,6 @@
+import json
+
+from app.services import corpus_difficulty
 from app.services.easy_converter import (
     apply_easy_terms,
     build_document_summary_points,
@@ -42,11 +45,32 @@ def test_intensity_levels_expand_the_conversion_scope():
     assert len(easy["paragraphs"][0]["changed_terms"]) < len(very_easy["paragraphs"][0]["changed_terms"])
 
 
-def test_nikl_frequency_statistics_drive_term_difficulty():
-    assert get_term_frequency("검토")["frequency_per_million"] > 0
-    assert get_term_difficulty("검토") == 2
-    assert get_term_difficulty("향후") == 1
-    assert get_term_difficulty("조율") == 2
+def test_nikl_frequency_statistics_drive_term_difficulty(tmp_path, monkeypatch):
+    stats_path = tmp_path / "term_frequency.json"
+    stats_path.write_text(
+        json.dumps(
+            {
+                "metadata": {"available": True},
+                "terms": {
+                    "검토": {"frequency_per_million": 12.5, "difficulty": 2},
+                    "향후": {"frequency_per_million": 25.0, "difficulty": 1},
+                    "조율": {"frequency_per_million": 3.0, "difficulty": 2},
+                },
+            },
+            ensure_ascii=False,
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(corpus_difficulty, "CORPUS_STATS_PATH", stats_path)
+    corpus_difficulty.load_corpus_stats.cache_clear()
+
+    try:
+        assert get_term_frequency("검토")["frequency_per_million"] > 0
+        assert get_term_difficulty("검토") == 2
+        assert get_term_difficulty("향후") == 1
+        assert get_term_difficulty("조율") == 2
+    finally:
+        corpus_difficulty.load_corpus_stats.cache_clear()
 
 
 def test_proposal_conjugation_stays_natural():
