@@ -61,6 +61,19 @@ NIKL_*.zip
 frontend/node_modules*/
 __MACOSX/
 
+# User documents, local databases, and downloaded archives
+*.pdf
+*.docx
+*.hwp
+*.hwpx
+*.sqlite
+*.sqlite3
+*.db
+*.zip
+*.tar
+*.tar.gz
+*.tgz
+
 # Local runtime output
 output/
 tmp/

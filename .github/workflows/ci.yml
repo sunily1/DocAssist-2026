@@ -9,6 +9,12 @@ permissions:
   contents: read
 
 jobs:
+  repository-hygiene:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - run: python scripts/check_repository_hygiene.py
+
   frontend:
     runs-on: ubuntu-latest
     steps:
