@@ -19,7 +19,7 @@ from app.services.easy_converter import (
 
 
 def build_openai_client():
-    client_options = {"api_key": settings.OPENAI_API_KEY}
+    client_options = {"api_key": settings.OPENAI_API_KEY or "not-configured"}
     if settings.OPENAI_BASE_URL:
         client_options["base_url"] = settings.OPENAI_BASE_URL
     return openai.AsyncOpenAI(**client_options)

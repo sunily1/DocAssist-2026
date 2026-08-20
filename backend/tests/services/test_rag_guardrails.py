@@ -2,7 +2,9 @@ from uuid import uuid4
 
 import pytest
 
-from app.services.rag_service import RAGService
+from app.core.config import settings
+from app.services.document_processor import build_openai_client as build_document_openai_client
+from app.services.rag_service import RAGService, build_openai_client as build_rag_openai_client
 
 
 class _ScalarResult:
@@ -66,6 +68,14 @@ def test_llm_failure_message_explains_provider_status():
 
     assert "제공 서버" in message
     assert "오류 500" in message
+
+
+def test_openai_clients_can_initialize_without_configured_credentials(monkeypatch):
+    monkeypatch.setattr(settings, "OPENAI_API_KEY", "")
+    monkeypatch.setattr(settings, "OPENAI_BASE_URL", "")
+
+    assert build_document_openai_client() is not None
+    assert build_rag_openai_client() is not None
 
 
 @pytest.mark.asyncio
