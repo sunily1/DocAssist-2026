@@ -23,6 +23,9 @@ export default {
   getDocument(id: string) {
     return api.get(`/documents/${id}`);
   },
+  reprocessDocument(id: string, intensity: AssistIntensity) {
+    return api.post(`/documents/${id}/reprocess`, { intensity });
+  },
   getGlossaryTerms(documentId?: string) {
     return api.get('/documents/glossary/terms', {
       params: documentId ? { document_id: documentId } : undefined,
@@ -46,6 +49,7 @@ export default {
   },
   getLayoutPdf(id: string) {
     return api.get(`/documents/${id}/layout-pdf`, {
+      params: { _t: Date.now() },
       responseType: 'blob',
     });
   },
@@ -56,12 +60,13 @@ export default {
   },
   getConvertedOriginalFile(id: string) {
     return api.get(`/documents/${id}/converted-original`, {
+      params: { _t: Date.now() },
       responseType: 'blob',
     });
   },
   getDocumentAnnotations(id: string, mode: 'converted' | 'original' = 'converted') {
     return api.get(`/documents/${id}/annotations`, {
-      params: { mode },
+      params: { mode, _t: Date.now() },
     });
   },
   deleteDocument(id: string) {

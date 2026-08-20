@@ -10,6 +10,7 @@ from app.core.config import settings
 from app.models.document import DocumentAnalysis, DocumentEmbedding
 from app.schemas.chat import ChatMessageCreate
 from app.services.document_processor import processor
+from app.services.easy_converter import build_document_summary_points
 
 
 def build_openai_client() -> AsyncOpenAI:
@@ -180,7 +181,13 @@ class RAGService:
                 blocks.append(cleaned)
         return blocks
 
-    def _fallback_answer(self, query: str, context: str, document_id: Optional[UUID]) -> str:
+    def _fallback_answer(
+        self,
+        query: str,
+        context: str,
+        document_id: Optional[UUID],
+        failure_message: str | None = None,
+    ) -> str:
         if document_id and context:
             snippets = [block[:160] for block in self._context_blocks(context)[:3]]
             if snippets:
@@ -188,13 +195,48 @@ class RAGService:
             return "선택한 문서에서 질문과 관련된 내용을 찾지 못했습니다."
         if document_id:
             return "선택한 문서에서 질문과 관련된 내용을 찾지 못했습니다. 문서 분석이 완료됐는지 확인해 주세요."
-        return "지금은 AI 연결이 원활하지 않아 일반 답변을 만들지 못했어요. 잠시 후 다시 시도해 주세요."
+        if failure_message:
+            return failure_message
+        return "AI 연결 설정을 확인해야 일반 질문에 답할 수 있어요. 문서를 선택하면 저장된 문서 내용은 바로 찾아드릴 수 있습니다."
+
+    def _llm_failure_message(self, exc: Exception) -> str:
+        status_code = getattr(exc, "status_code", None)
+        if status_code in (401, 403):
+            return "AI 인증에 실패했습니다. 관리자에게 API 키 사용 권한을 확인해 달라고 요청해 주세요."
+        if status_code == 429:
+            return "AI 사용량 제한에 도달했습니다. 잠시 후 다시 시도해 주세요."
+        if isinstance(status_code, int) and status_code >= 500:
+            return f"AI 제공 서버가 요청을 처리하지 못했습니다(오류 {status_code}). 잠시 후 다시 시도해 주세요."
+        return "AI 서버에 연결하지 못했습니다. 네트워크와 서버 주소를 확인해 주세요."
+
+    async def _document_summary_answer(
+        self,
+        db: AsyncSession,
+        document_id: UUID,
+    ) -> tuple[str, list[dict]]:
+        result = await db.execute(
+            select(DocumentAnalysis).filter(DocumentAnalysis.document_id == document_id)
+        )
+        analysis = result.scalars().first()
+        if not analysis:
+            return "", []
+
+        points = build_document_summary_points(analysis.paragraphs or [])
+        if not points:
+            fallback = self._compact_text(analysis.summary or "")
+            points = [fallback] if fallback else []
+        if not points:
+            return "", []
+
+        content = "문서 핵심 요약입니다.\n" + "\n".join(f"- {point}" for point in points)
+        citations = [self._make_citation(1, "문서 요약", 100, "\n".join(points))]
+        return content, citations
 
     def _extract_answer_content(self, response) -> str:
         message = response.choices[0].message
         content = getattr(message, "content", None)
         if content:
-            return content
+            return content.strip()
 
         reasoning = getattr(message, "reasoning", None)
         if reasoning:
@@ -220,6 +262,18 @@ class RAGService:
         if document_id:
             context, citations = await self.retrieve_context_bundle(db, query, document_id)
 
+        if document_id and self._is_summary_request(query):
+            summary_answer, summary_citations = await self._document_summary_answer(db, document_id)
+            if summary_answer:
+                return ChatMessageCreate(
+                    role="assistant",
+                    content=summary_answer,
+                    model_name=model or self.model_name,
+                    prompt_tokens=0,
+                    completion_tokens=0,
+                    citations=summary_citations,
+                )
+
         if document_id and not context:
             return ChatMessageCreate(
                 role="assistant",
@@ -234,7 +288,9 @@ class RAGService:
             "You are DocAssist, a Korean business document assistant. "
             "Answer in natural, clear Korean. "
             "Answer the user's exact question first. "
-            "Keep the answer concise unless the user asks for detail."
+            "Keep the answer concise unless the user asks for detail. "
+            "Prefer familiar workplace words over formal Sino-Korean or ceremonial phrases. "
+            "Avoid expressions such as '불가피한 사유', '너른 양해', '제고', and '상기' when a plain alternative exists."
         )
 
         if user_settings and "assist" in user_settings:
@@ -273,7 +329,7 @@ class RAGService:
             response = await self.client.chat.completions.create(
                 model=model or self.model_name,
                 messages=full_messages,
-                temperature=0.4,
+                temperature=0.2,
                 max_tokens=1000,
             )
             usage = response.usage
@@ -290,7 +346,12 @@ class RAGService:
             print("ERROR: LLM API authentication failed.")
             return ChatMessageCreate(
                 role="assistant",
-                content=self._fallback_answer(query, context, document_id),
+                content=self._fallback_answer(
+                    query,
+                    context,
+                    document_id,
+                    "AI 인증에 실패했습니다. 관리자에게 API 키 사용 권한을 확인해 달라고 요청해 주세요.",
+                ),
                 model_name=model or self.model_name,
                 prompt_tokens=0,
                 completion_tokens=0,
@@ -300,7 +361,12 @@ class RAGService:
             print(f"ERROR: LLM API call failed: {exc}")
             return ChatMessageCreate(
                 role="assistant",
-                content=self._fallback_answer(query, context, document_id),
+                content=self._fallback_answer(
+                    query,
+                    context,
+                    document_id,
+                    self._llm_failure_message(exc),
+                ),
                 model_name=model or self.model_name,
                 prompt_tokens=0,
                 completion_tokens=0,

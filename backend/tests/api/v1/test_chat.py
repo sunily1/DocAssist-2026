@@ -27,7 +27,7 @@ async def test_chat_flow(client: AsyncClient, db):
         headers=headers,
         json={"title": "Test Chat"}
     )
-    assert response.status_code == 200
+    assert response.status_code == 201
     session_data = response.json()
     session_id = session_data["id"]
     assert session_data["title"] == "Test Chat"
@@ -56,4 +56,15 @@ async def test_chat_flow(client: AsyncClient, db):
     assert len(sessions) > 0
     assert sessions[0]["id"] == session_id
 
+    # 5. Delete the current conversation and verify it is no longer accessible.
+    response = await client.delete(
+        f"{settings.API_V1_STR}/chat/sessions/{session_id}",
+        headers=headers,
+    )
+    assert response.status_code == 204
 
+    response = await client.get(
+        f"{settings.API_V1_STR}/chat/sessions/{session_id}/messages",
+        headers=headers,
+    )
+    assert response.status_code == 404

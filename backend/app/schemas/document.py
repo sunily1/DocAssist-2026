@@ -140,6 +140,12 @@ class TextDocxDownloadRequest(TextConvertRequest):
     mode: str = "summary"
 
 
+class DocumentReprocessRequest(BaseModel):
+    """저장된 문서를 다른 쉬운말 강도로 다시 변환하는 요청."""
+
+    intensity: str = "easy"
+
+
 class DocumentAnnotationRead(BaseModel):
     """실제 파일 페이지 위에 표시할 변경 표현 좌표."""
 

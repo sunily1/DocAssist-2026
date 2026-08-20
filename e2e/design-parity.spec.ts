@@ -128,8 +128,8 @@ test('major screens preserve the DOQ desktop geometry', async ({ page }) => {
   await page.locator('.doq-doc-picker').click();
   await expect(page.locator('.doq-doc-menu')).toBeVisible();
   await page.locator('.doq-doc-menu input').fill('임대차');
-  await expect(page.locator('.doq-doc-options button')).toHaveCount(2);
-  await page.locator('.doq-doc-options button').nth(1).click();
+  await expect(page.locator('.doq-doc-options button')).toHaveCount(1);
+  await page.locator('.doq-doc-options button').first().click();
   await expect(page.locator('.doq-doc-picker')).toContainText('임대차계약서.pdf');
 });
 
@@ -246,7 +246,8 @@ test('PDF viewer renders the file and synchronizes coordinate highlights', async
   await expect(page.locator('.doq-font-controls output')).toHaveText('109%');
   await expect.poll(() => page.locator('.pdf-page-shell').evaluate((element) => element.getBoundingClientRect().width))
     .toBeGreaterThan(initialPageWidth + 20);
-  await expect(page.locator('.pdf-inline-replacement')).toHaveCount(1);
+  await expect(page.locator('.pdf-inline-replacement')).toHaveCount(0);
+  await expect(page.locator('.pdf-change-mark.approximate')).toHaveCSS('border-bottom-style', 'solid');
   for (let index = 0; index < 4; index += 1) {
     await page.getByRole('button', { name: '글자 및 PDF 확대' }).click();
   }
@@ -295,4 +296,17 @@ test('PDF viewer renders the file and synchronizes coordinate highlights', async
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
   expect(overflow).toBeLessThanOrEqual(0);
   await page.screenshot({ path: '/tmp/doq-pdf-document-viewer-mobile.png', fullPage: true });
+});
+
+test('Q&A starts with direct questions and can clear the current conversation', async ({ page }) => {
+  await mockApi(page);
+  await page.goto('http://localhost:3000/qa');
+
+  await expect(page.locator('.doq-doc-picker')).toContainText('문서 선택 (선택사항)');
+  await page.locator('.doq-doc-picker').click();
+  await expect(page.locator('.doq-doc-options')).not.toContainText('문서 없이 질문');
+
+  page.once('dialog', (dialog) => dialog.accept());
+  await page.getByRole('button', { name: '대화 지우기' }).click();
+  await expect(page.getByRole('status')).toContainText('대화 내용을 지웠습니다.');
 });

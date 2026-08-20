@@ -18,6 +18,10 @@ from app.models import (
 )
 from app.main import app
 from app.core.config import settings
+from app.api.v1.endpoints import documents as document_endpoints
+from app.services.document_processor import processor
+from app.services.easy_converter import build_easy_conversion
+from app.services.rag_service import rag_service
 
 def _test_database_url() -> str:
     configured = os.getenv("TEST_DATABASE_URL", "").strip()
@@ -46,6 +50,30 @@ async def db_engine():
     yield engine
     # await conn.run_sync(Base.metadata.drop_all) # Optional
     await engine.dispose()
+
+
+@pytest.fixture(scope="function", autouse=True)
+async def isolate_background_tasks(db_engine, monkeypatch):
+    """Keep background jobs and external AI calls deterministic in tests."""
+    test_session_factory = sessionmaker(
+        autocommit=False,
+        autoflush=False,
+        expire_on_commit=False,
+        bind=db_engine,
+        class_=AsyncSession,
+    )
+
+    async def fake_embeddings(chunks):
+        return [[0.0] * 1536 for _ in chunks]
+
+    async def fake_analysis(text_value, intensity="easy"):
+        return build_easy_conversion(text_value, intensity)
+
+    monkeypatch.setattr(document_endpoints, "SessionLocal", test_session_factory)
+    monkeypatch.setattr(processor, "create_embeddings", fake_embeddings)
+    monkeypatch.setattr(processor, "analyze_document", fake_analysis)
+    monkeypatch.setattr(rag_service, "_can_use_llm", lambda: False)
+    yield
 
 @pytest.fixture(scope="function")
 async def db(db_engine) -> AsyncGenerator[AsyncSession, None]:

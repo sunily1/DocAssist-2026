@@ -11,8 +11,10 @@ export default {
   getMessages(sessionId: string, skip = 0, limit = 100) {
     return api.get(`/chat/sessions/${sessionId}/messages`, { params: { skip, limit } });
   },
+  deleteSession(sessionId: string) {
+    return api.delete(`/chat/sessions/${sessionId}`);
+  },
   askQuestion(sessionId: string, question: string) {
     return api.post(`/chat/sessions/${sessionId}/ask`, { question });
   },
 };
-

@@ -40,7 +40,7 @@
               <strong>{{ showHard ? "원문" : "쉬운말 문서" }}</strong>
               <button type="button" :class="{ on: !showHard }" @click="showHard = !showHard"><span>✓</span>{{ showHard ? "쉬운말 보기" : "원문 보기" }}</button>
             </header>
-            <div class="doq-level-row"><span>쉬운 정도</span><div><button v-for="level in [1,2,3]" :key="level" :class="{ active: easyLevel === level }" @click="easyLevel = level">{{ level === 1 ? "살짝" : level === 2 ? "쉽게" : "아주 쉽게" }}</button></div></div>
+            <div class="doq-level-row"><span>쉬운 정도</span><div><button v-for="level in [1,2,3]" :key="level" :class="{ active: easyLevel === level }" :disabled="reprocessing || !isDone" @click="changeEasyLevel(level)">{{ level === 1 ? "살짝" : level === 2 ? "쉽게" : "아주 쉽게" }}</button></div></div>
             <div class="doq-reader-divider" />
             <div class="doq-document-viewport">
               <Transition name="doq-document-swap">
@@ -197,6 +197,7 @@ const selectedTerm = ref<TermItem | null>(null);
 const selectedChange = ref<ChangeItem | null>(null);
 const showHard = ref(false);
 const easyLevel = ref(2);
+const reprocessing = ref(false);
 const docFeedback = ref("");
 
 const originalBlob = ref<Blob | null>(null);
@@ -230,7 +231,16 @@ const changeItems = computed<ChangeItem[]>(() => {
   const seen = new Set<string>();
   const items: ChangeItem[] = [];
   paragraphs.value.forEach((paragraph, paragraphIndex) => {
-    (paragraph.changed_terms || []).forEach((term, termIndex) => {
+    const orderedTerms = (paragraph.changed_terms || [])
+      .map((term, termIndex) => ({ term, termIndex }))
+      .sort((left, right) => {
+        const leftPosition = paragraph.original.indexOf(String(left.term.from || ""));
+        const rightPosition = paragraph.original.indexOf(String(right.term.from || ""));
+        return (leftPosition < 0 ? Number.MAX_SAFE_INTEGER : leftPosition)
+          - (rightPosition < 0 ? Number.MAX_SAFE_INTEGER : rightPosition)
+          || left.termIndex - right.termIndex;
+      });
+    orderedTerms.forEach(({ term, termIndex }) => {
       const from = String(term.from || "").trim();
       const to = String(term.to || "").trim();
       if (!isMeaningfulChange(from, to)) return;
@@ -299,6 +309,8 @@ async function loadDocument() {
     analysis.summary = doc.analysis?.summary || "";
     paragraphs.value = doc.analysis?.paragraphs || [];
     convertedText.value = doc.meta_data?.converted_text || "";
+    const intensity = String(doc.meta_data?.intensity || "easy");
+    easyLevel.value = intensity === "close" ? 1 : intensity === "summary" ? 3 : 2;
     terms.value = (doc.glossary_terms || []).map((item: any) => ({
       term: item.term,
       definition: item.definition,
@@ -330,6 +342,31 @@ function startPolling() {
   pollTimer.value = window.setInterval(() => {
     loadDocument();
   }, 2500);
+}
+
+async function changeEasyLevel(level: number) {
+  if (level === easyLevel.value || reprocessing.value || !isDone.value) return;
+  const intensity = level === 1 ? "close" : level === 3 ? "summary" : "easy";
+  reprocessing.value = true;
+  try {
+    await documentService.reprocessDocument(docId.value, intensity);
+    easyLevel.value = level;
+    status.value = "QUEUED";
+    convertedOriginalBlob.value = null;
+    originalPdfAnnotations.value = [];
+    convertedPdfAnnotations.value = [];
+    pdfAnnotationsLoaded.value = false;
+    paragraphs.value = [];
+    terms.value = [];
+    convertedText.value = "";
+    selectedChange.value = null;
+    startPolling();
+  } catch (error) {
+    console.error("Reprocess failed", error);
+    alert("쉬운 정도를 변경하지 못했습니다. 잠시 후 다시 시도해 주세요.");
+  } finally {
+    reprocessing.value = false;
+  }
 }
 
 async function loadOriginalFile(force = false) {
@@ -449,7 +486,7 @@ function statusLabel(value: DocStatus) {
 .doq-doc-state { padding: 42px; border: 1px solid var(--line); border-radius: 20px; color: var(--muted); background: var(--surface); text-align: center; }.doq-doc-state.error { color: #c0392b; }
 .doq-reader-grid { display: grid; grid-template-columns: minmax(0, var(--pdf-panel-width, calc(100% - 308px))) minmax(260px, 1fr); gap: 18px; align-items: start; }.doq-reader-grid.wide-pdf-layout { grid-template-columns: minmax(0, 1fr); }.doq-reader-grid.wide-pdf-layout .doq-reader-side { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }.doq-reader { min-height: 420px; padding: 30px 36px; border: 1px solid var(--line); border-radius: 20px; background: var(--surface); }
 .doq-reader-head { margin-bottom: 8px; display: flex; align-items: center; justify-content: space-between; }.doq-reader-head > strong { font-size: 15px; }.doq-reader-head button { height: 34px; padding: 0 11px; display: flex; align-items: center; gap: 7px; border: 1px solid var(--line); border-radius: 10px; color: var(--muted); background: var(--surface); font-size: 12px; font-weight: 600; cursor: pointer; }.doq-reader-head button span { width: 18px; height: 18px; display: grid; place-items: center; border-radius: 50%; color: #fff; background: var(--muted); font-size: 10px; }.doq-reader-head button.on { color: var(--accent-strong); background: var(--soft); }.doq-reader-head button.on span { background: #12a58a; }
-.doq-level-row { margin: 2px 0 6px; display: flex; align-items: center; gap: 10px; }.doq-level-row > span { color: var(--muted); font-size: 12.5px; font-weight: 600; }.doq-level-row > div { padding: 3px; display: flex; gap: 3px; border-radius: 10px; background: var(--soft); }.doq-level-row button { padding: 6px 11px; border: 0; border-radius: 8px; color: var(--muted); background: transparent; font-size: 12px; font-weight: 600; cursor: pointer; }.doq-level-row button.active { color: var(--ink); background: var(--surface); box-shadow: 0 1px 3px rgb(0 0 0 / .08); }
+.doq-level-row { margin: 2px 0 6px; display: flex; align-items: center; gap: 10px; }.doq-level-row > span { color: var(--muted); font-size: 12.5px; font-weight: 600; }.doq-level-row > div { padding: 3px; display: flex; gap: 3px; border-radius: 10px; background: var(--soft); }.doq-level-row button { padding: 6px 11px; border: 0; border-radius: 8px; color: var(--muted); background: transparent; font-size: 12px; font-weight: 600; cursor: pointer; }.doq-level-row button.active { color: var(--ink); background: var(--surface); box-shadow: 0 1px 3px rgb(0 0 0 / .08); }.doq-level-row button:disabled { cursor: wait; opacity: .58; }
 .doq-reader-divider { height: 1px; margin: 12px 0 24px; background: var(--line); }.doq-reading { color: var(--sub); font-size: var(--reader-size); line-height: 2.05; white-space: pre-wrap; }.doq-reading p { margin: 0 0 26px; }.doq-reading p:last-child { margin-bottom: 0; }.doq-reading mark { color: var(--ink); background: linear-gradient(transparent 64%, #ddd2ff 64%) left bottom / 100% 100% no-repeat; font-weight: 700; animation: doq-text-mark-in .55s ease var(--change-delay, 0s) both; }.doq-reading.original mark { animation-name: doq-text-mark-in-original; }[data-theme="dark"] .doq-reading mark { background-image: linear-gradient(transparent 64%, #574883 64%); }
 .doq-document-viewport { display: grid; overflow: hidden; }.doq-document-stage { min-width: 0; grid-area: 1 / 1; transform-origin: center top; }.doq-document-swap-enter-active, .doq-document-swap-leave-active { transition: opacity .4s ease, transform .4s ease; }.doq-document-swap-enter-from { opacity: 0; transform: translateY(14px); }.doq-document-swap-leave-to { opacity: 0; transform: translateY(-14px); }
 @keyframes doq-text-mark-in { from { opacity: 0; transform: translateY(40%); background-size: 0 100%; } to { opacity: 1; transform: translateY(0); background-size: 100% 100%; } }

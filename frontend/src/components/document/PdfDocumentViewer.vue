@@ -22,7 +22,6 @@
           :aria-label="`${annotation.original}을 ${annotation.easy}로 변경`"
           @click="$emit('select', annotation.id)"
         >
-          <span v-if="!original && annotation.approximate" class="pdf-inline-replacement">{{ annotation.easy }}</span>
           <span class="pdf-change-tooltip">{{ annotation.original }} → {{ annotation.easy }}</span>
         </button>
         <span class="pdf-page-number">{{ page.number }}</span>
@@ -187,13 +186,12 @@ onBeforeUnmount(async () => {
 .pdf-document-viewer { width: 100%; max-width: 100%; height: min(72vh, 820px); min-height: 480px; padding: 18px; overflow: auto; overscroll-behavior: contain; scrollbar-gutter: stable both-edges; scrollbar-color: #918ca0 #cbc9d2; scrollbar-width: auto; touch-action: pan-x pan-y; border-radius: 14px; background: #dedde4; }
 .pdf-document-viewer::-webkit-scrollbar { width: 12px; height: 12px; }.pdf-document-viewer::-webkit-scrollbar-track { background: #cbc9d2; }.pdf-document-viewer::-webkit-scrollbar-thumb { border: 3px solid #cbc9d2; border-radius: 999px; background: #817b90; }
 .pdf-pages { width: max-content; min-width: 100%; display: flex; flex-direction: column; align-items: center; gap: 18px; }
-.pdf-page-shell { position: relative; flex: none; overflow: hidden; background: #fff; box-shadow: 0 3px 14px rgb(32 26 58 / .16); transition: width .2s ease; }
+.pdf-page-shell { position: relative; flex: none; overflow: hidden; container-type: inline-size; background: #fff; box-shadow: 0 3px 14px rgb(32 26 58 / .16); transition: width .2s ease; }
 .pdf-page-shell canvas { width: 100% !important; height: 100% !important; display: block; }
-.pdf-change-mark { position: absolute; z-index: 2; min-width: 6px; min-height: 8px; padding: 0; overflow: visible; container-type: size; border: 0; border-bottom: 3px solid #7658ff; border-radius: 2px; color: transparent; background: rgb(106 77 255 / .13); cursor: pointer; transition: background .15s ease, box-shadow .15s ease; animation: pdf-mark-in .55s ease var(--mark-delay, 0s) both; }
+.pdf-change-mark { position: absolute; z-index: 2; min-width: 6px; min-height: 8px; padding: 0; overflow: visible; border: 0; border-bottom: 3px solid #7658ff; border-radius: 2px; color: transparent; background: rgb(106 77 255 / .13); cursor: pointer; transition: background .15s ease, box-shadow .15s ease; animation: pdf-mark-in .55s ease var(--mark-delay, 0s) both; }
 .pdf-change-mark.original { animation-name: pdf-mark-in-original; }
 .pdf-change-mark:hover, .pdf-change-mark.selected { background: rgb(106 77 255 / .24); box-shadow: 0 0 0 2px rgb(106 77 255 / .36); }
-.pdf-change-mark.approximate { border-bottom-style: dashed; }
-.pdf-inline-replacement { position: absolute; z-index: 1; inset: 0 auto auto 0; width: max-content; min-width: 100%; height: 100%; padding: 0 2px; display: flex; align-items: center; color: #181522; background: #fff; white-space: nowrap; font-size: clamp(7px, 70cqh, 18px); font-weight: 600; line-height: 1; }
+.pdf-change-mark.approximate { border-bottom-style: solid; }
 .pdf-change-tooltip { position: absolute; z-index: 3; left: 50%; bottom: calc(100% + 7px); max-width: 260px; padding: 6px 9px; display: none; transform: translateX(-50%); border-radius: 8px; color: #fff; background: #191527; white-space: nowrap; font-size: 11px; font-weight: 600; box-shadow: 0 6px 18px rgb(25 21 39 / .24); }
 .pdf-change-mark:hover .pdf-change-tooltip, .pdf-change-mark:focus-visible .pdf-change-tooltip { display: block; }
 .pdf-page-number { position: absolute; right: 10px; bottom: 8px; padding: 3px 7px; border-radius: 999px; color: #686477; background: rgb(255 255 255 / .86); font-size: 10px; }

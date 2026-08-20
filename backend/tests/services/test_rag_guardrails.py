@@ -57,6 +57,17 @@ def test_lexical_overlap_filters_unrelated_evidence():
     assert not service._has_lexical_overlap("부산 출장비 항공권", "회의 일시는 7월 20일 오전 10시입니다.")
 
 
+def test_llm_failure_message_explains_provider_status():
+    service = RAGService()
+    provider_error = RuntimeError("provider failed")
+    provider_error.status_code = 500
+
+    message = service._llm_failure_message(provider_error)
+
+    assert "제공 서버" in message
+    assert "오류 500" in message
+
+
 @pytest.mark.asyncio
 async def test_summary_request_uses_saved_analysis_without_keyword_overlap(monkeypatch):
     service = RAGService()

@@ -3,23 +3,26 @@
     <main class="doq-qa">
       <header class="doq-qa-head">
         <span class="doq-qa-logo"><MessageSquareText :size="19" /></span>
-        <div><h1>무엇이든 물어보기</h1><small>{{ selectedDoc ? `${selectedDoc.title} 내용으로 답해 드려요.` : "문서 없이 일반적인 질문에 답해요." }}</small></div>
+        <div><h1>무엇이든 물어보기</h1><small>{{ selectedDoc ? `${selectedDoc.title} 내용으로 답해 드려요.` : "바로 질문하거나 문서를 선택할 수 있어요." }}</small></div>
       </header>
 
-      <div class="doq-picker-wrap">
-        <button class="doq-doc-picker" type="button" :aria-expanded="docPickerOpen" @click="docPickerOpen = !docPickerOpen">
-          <FileText :size="16" />
-          <span>{{ selectedDoc?.title || "문서 없이 질문" }}</span>
-          <ChevronDown :size="15" />
-        </button>
-        <div v-if="docPickerOpen" class="doq-doc-menu">
-          <label><Search :size="15" /><input v-model.trim="docQuery" placeholder="문서 검색" /></label>
-          <div class="doq-doc-options">
-            <button type="button" @click="pickDocument('')"><span class="general"><MessageSquareText :size="14" /></span><em>문서 없이 질문</em></button>
-            <button v-for="doc in filteredDocs" :key="doc.id" type="button" :disabled="doc.status !== 'DONE'" @click="pickDocument(doc.id)"><span>{{ doc.type }}</span><em>{{ doc.title }}</em><small v-if="doc.status !== 'DONE'">{{ documentStatusLabel(doc.status) }}</small></button>
-            <p v-if="filteredDocs.length === 0">검색 결과가 없어요.</p>
+      <div class="doq-picker-row">
+        <div class="doq-picker-wrap">
+          <button class="doq-doc-picker" type="button" :aria-expanded="docPickerOpen" @click="docPickerOpen = !docPickerOpen">
+            <FileText :size="16" />
+            <span>{{ selectedDoc?.title || "문서 선택 (선택사항)" }}</span>
+            <ChevronDown :size="15" />
+          </button>
+          <div v-if="docPickerOpen" class="doq-doc-menu">
+            <label><Search :size="15" /><input v-model.trim="docQuery" placeholder="문서 검색" /></label>
+            <div class="doq-doc-options">
+              <button v-for="doc in filteredDocs" :key="doc.id" type="button" :disabled="doc.status !== 'DONE'" @click="pickDocument(doc.id)"><span>{{ doc.type }}</span><em>{{ doc.title }}</em><small v-if="doc.status !== 'DONE'">{{ documentStatusLabel(doc.status) }}</small></button>
+              <p v-if="filteredDocs.length === 0">검색 결과가 없어요.</p>
+            </div>
           </div>
         </div>
+        <button v-if="selectedDoc" class="doq-scope-clear" type="button" title="문서 선택 해제" aria-label="문서 선택 해제" @click="pickDocument('')"><X :size="16" /></button>
+        <button class="doq-chat-clear" type="button" :disabled="sending" @click="clearConversation"><Trash2 :size="15" /><span>대화 지우기</span></button>
       </div>
 
       <section ref="chatRef" class="doq-chat">
@@ -35,8 +38,8 @@
           <span v-if="message.role === 'assistant'" class="doq-assistant"><Search :size="16" :stroke-width="2.5" /></span>
           <div>
             <div class="doq-bubble"><p v-for="(line, index) in message.text.split('\n')" :key="index">{{ line }}</p></div>
-            <div v-if="message.role === 'assistant' && message.citations?.length" class="doq-citations">
-              <button v-for="citation in message.citations" :key="citation.citeId" type="button" @click="selectEvidence(citation)">{{ citationLabel(citation) }}</button>
+            <div v-if="message.role === 'assistant' && uniqueCitations(message.citations).length" class="doq-citations">
+              <button v-for="citation in uniqueCitations(message.citations)" :key="citation.citeId" type="button" @click="selectEvidence(citation)">{{ citationLabel(citation) }}</button>
             </div>
           </div>
         </article>
@@ -52,7 +55,7 @@
         <input v-model="input" :placeholder="selectedDoc ? '이 문서에서 궁금한 내용을 물어보세요.' : '궁금한 내용을 입력하세요.'" :disabled="sending" />
         <button type="submit" aria-label="메시지 전송" :disabled="sending || !input.trim()"><ArrowRight :size="19" /></button>
       </form>
-      <div v-if="toast" class="toast">{{ toast }}</div>
+      <div v-if="toast" class="toast" role="status">{{ toast }}</div>
     </main>
 
 
@@ -62,7 +65,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, ref, watch } from "vue";
 import { useRoute } from "vue-router";
-import { ArrowRight, ChevronDown, FileText, MessageSquareText, Search } from "@lucide/vue";
+import { ArrowRight, ChevronDown, FileText, MessageSquareText, Search, Trash2, X } from "@lucide/vue";
 import documentService from "../api/document.service";
 import chatService from "../api/chat.service";
 import AppLayout from "../components/layout/AppLayout.vue";
@@ -106,9 +109,18 @@ function documentStatusLabel(status: DocStatus) {
   return "분석 대기";
 }
 function citationLabel(citation: Citation) {
-  if (citation.section === "요약") return "문서 요약";
+  if (citation.section === "요약" || citation.section === "문서 요약") return "문서 요약";
   const number = citation.section.match(/(?:문단|청크)\s*(\d+)/)?.[1];
   return number ? `${number}번 문단` : citation.section;
+}
+function uniqueCitations(citations: Citation[] | undefined) {
+  const seen = new Set<string>();
+  return (citations || []).filter((citation) => {
+    const label = citationLabel(citation);
+    if (seen.has(label)) return false;
+    seen.add(label);
+    return true;
+  });
 }
 function pickDocument(id: string) {
   const document = docs.value.find((doc) => doc.id === id);
@@ -119,6 +131,21 @@ function pickDocument(id: string) {
   selectedDocId.value = id;
   docPickerOpen.value = false;
   docQuery.value = "";
+}
+async function clearConversation() {
+  if (sending.value || !window.confirm("현재 대화 내용을 모두 지울까요?")) return;
+  try {
+    if (currentSessionId.value) await chatService.deleteSession(currentSessionId.value);
+    const title = selectedDoc.value ? `${selectedDoc.value.title} Q&A` : "일반 질문";
+    const session = await chatService.createSession(title, selectedDocId.value || undefined);
+    currentSessionId.value = session.data.id;
+    messages.value = [];
+    activeEvidence.value = null;
+    showToast("대화 내용을 지웠습니다.");
+  } catch (error) {
+    console.error("Conversation reset failed", error);
+    showToast("대화 내용을 지우지 못했습니다.");
+  }
 }
 async function loadDocuments() {
   try {
@@ -195,10 +222,13 @@ watch(selectedDocId, async (newValue) => {
 .doq-qa-head { margin-bottom: 16px; padding-bottom: 16px; display: flex; align-items: center; gap: 12px; border-bottom: 1px solid var(--line); }
 .doq-qa-logo, .doq-assistant { display: grid; place-items: center; flex: none; color: #fff; background: var(--accent-gradient); }
 .doq-qa-logo { width: 38px; height: 38px; border-radius: 11px; }.doq-qa-head > div { min-width: 0; display: grid; flex: 1; }.doq-qa-head h1 { margin: 0; font-size: 16px; }.doq-qa-head small { margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); font-size: 12.5px; }
-.doq-picker-wrap { position: relative; width: fit-content; max-width: 340px; margin-bottom: 16px; }
+.doq-picker-row { margin-bottom: 16px; display: flex; align-items: center; gap: 8px; }
+.doq-picker-wrap { position: relative; width: fit-content; max-width: 340px; }
 .doq-doc-picker { width: fit-content; max-width: 340px; height: 40px; padding: 0 11px 0 13px; display: flex; align-items: center; gap: 8px; border: 1px solid var(--line); border-radius: 12px; color: var(--accent); background: var(--surface); cursor: pointer; }
 .doq-doc-picker > span { min-width: 0; max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--sub); font-size: 13px; font-weight: 600; }
 .doq-doc-picker > svg:last-child { color: var(--muted); }
+.doq-scope-clear, .doq-chat-clear { height: 40px; display: inline-flex; align-items: center; justify-content: center; gap: 6px; border: 1px solid var(--line); border-radius: 11px; color: var(--muted); background: var(--surface); cursor: pointer; }
+.doq-scope-clear { width: 40px; padding: 0; }.doq-chat-clear { margin-left: auto; padding: 0 12px; font-size: 12px; font-weight: 600; }.doq-chat-clear:disabled { opacity: .5; cursor: default; }
 .doq-doc-menu { position: absolute; z-index: 20; top: 46px; left: 0; width: 340px; padding: 10px; border: 1px solid var(--line); border-radius: 14px; background: var(--surface); box-shadow: 0 14px 36px rgb(32 25 68 / .14); }
 .doq-doc-menu > label { height: 38px; padding: 0 11px; display: flex; align-items: center; gap: 8px; border: 1px solid var(--line); border-radius: 10px; color: var(--muted); background: var(--soft); }
 .doq-doc-menu input { min-width: 0; flex: 1; border: 0; outline: 0; color: var(--ink); background: transparent; font-size: 13px; }
@@ -222,5 +252,5 @@ watch(selectedDocId, async (newValue) => {
 .doq-evidence > div { display: flex; gap: 8px; font-size: 12px; }.doq-evidence span { color: var(--muted); }.doq-evidence p { margin: 5px 0 0; color: var(--sub); font-size: 12.5px; line-height: 1.6; }.doq-evidence > button { position: absolute; top: 9px; right: 10px; border: 0; color: var(--muted); background: transparent; font-size: 12px; cursor: pointer; }
 .doq-composer { margin-top: 18px; padding: 7px 7px 7px 18px; display: flex; align-items: center; gap: 10px; border: 1.5px solid var(--line); border-radius: 16px; background: var(--surface); }.doq-composer:focus-within { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
 .doq-composer input { min-width: 0; flex: 1; border: 0; outline: 0; color: var(--ink); background: transparent; font-size: 14.5px; }.doq-composer > button { width: 42px; height: 42px; display: grid; place-items: center; flex: none; border: 0; border-radius: 12px; color: #fff; background: var(--accent-gradient); cursor: pointer; }.doq-composer > button:disabled { opacity: .45; cursor: default; }
-@media (max-width: 620px) { .doq-qa { padding: 18px 16px; }.doq-message { max-width: 92%; }.doq-qa-head small { max-width: 220px; }.doq-picker-wrap, .doq-doc-picker { max-width: 100%; }.doq-doc-picker > span { max-width: calc(100vw - 145px); }.doq-doc-menu { width: min(340px, calc(100vw - 32px)); } }
+@media (max-width: 620px) { .doq-qa { padding: 18px 16px; }.doq-message { max-width: 92%; }.doq-qa-head small { max-width: 220px; }.doq-picker-row { flex-wrap: wrap; }.doq-picker-wrap, .doq-doc-picker { max-width: 100%; }.doq-picker-wrap { flex: 1; }.doq-doc-picker { width: 100%; }.doq-doc-picker > span { max-width: calc(100vw - 190px); }.doq-chat-clear { margin-left: 0; }.doq-chat-clear span { display: none; }.doq-doc-menu { width: min(340px, calc(100vw - 32px)); } }
 </style>

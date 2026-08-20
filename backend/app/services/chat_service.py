@@ -57,6 +57,12 @@ async def get_user_sessions(
     )
     return result.scalars().all()
 
+
+async def delete_session(db: AsyncSession, session: ChatSession) -> None:
+    """Delete a chat session and its messages through the ORM cascade."""
+    await db.delete(session)
+    await db.commit()
+
 async def create_message(
     db: AsyncSession, session_id: UUID, obj_in: ChatMessageCreate
 ) -> ChatMessage:

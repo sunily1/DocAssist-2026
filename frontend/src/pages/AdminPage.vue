@@ -128,7 +128,7 @@ function defaultStats(): AdminMetrics {
       backend: { status: "ok", label: "백엔드", message: "정상" },
       db: { status: "ok", label: "DB", message: "정상" },
       openai: { status: "warn", label: "OpenAI", message: "키 확인 필요" },
-      dictionary: { status: "warn", label: "국어사전", message: "연동 예정" },
+      dictionary: { status: "warn", label: "온용어", message: "연결 확인 중" },
     },
     trend: [],
   };

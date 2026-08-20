@@ -30,7 +30,7 @@ async def test_upload_document(client: AsyncClient, db):
         files=files
     )
     
-    assert response.status_code == 200
+    assert response.status_code == 201
     data = response.json()
     assert data["title"] == "test.txt"
     assert data["original_filename"] == "test.txt"
@@ -52,7 +52,10 @@ async def test_upload_document(client: AsyncClient, db):
         f"{settings.API_V1_STR}/documents/{doc_id}",
         headers=headers
     )
-    assert response.status_code == 200
-    assert response.json()["deleted_at"] is not None
+    assert response.status_code == 204
 
-
+    response = await client.get(
+        f"{settings.API_V1_STR}/documents/{doc_id}",
+        headers=headers,
+    )
+    assert response.status_code == 404

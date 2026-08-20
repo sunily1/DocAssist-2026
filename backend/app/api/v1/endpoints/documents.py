@@ -13,9 +13,11 @@ from app.api import deps
 from app.db.session import SessionLocal
 from app.models.user import User
 from app.models.system import SystemLog
+from app.models.document import DocStatus
 from app.schemas.document import (
     DocumentAnnotationsRead,
     DocumentRead,
+    DocumentReprocessRequest,
     DocumentUpdate,
     DocumentWithAnalysis,
     GlossaryEntryRead,
@@ -27,6 +29,7 @@ from app.schemas.document import (
 from app.services import document_service
 from app.services import glossary_service
 from app.services.document_processor import processor
+from app.services.easy_converter import INTENSITY_LABELS, normalize_intensity
 
 router = APIRouter()
 
@@ -118,6 +121,33 @@ async def upload_document(
     document = await document_service.create_with_file(db, current_user.id, file, intensity=intensity)
     background_tasks.add_task(run_document_processing, document.id)
 
+    return document
+
+
+@router.post("/{document_id}/reprocess", response_model=DocumentRead)
+async def reprocess_document(
+    document_id: UUID,
+    payload: DocumentReprocessRequest,
+    background_tasks: BackgroundTasks,
+    current_user: User = Depends(deps.get_current_user),
+    db: AsyncSession = Depends(deps.get_db),
+) -> Any:
+    """저장된 원본 파일을 선택한 쉬운말 강도로 다시 분석합니다."""
+    document = await _get_doc_or_404(db, document_id, current_user)
+    if document.status in {DocStatus.QUEUED, DocStatus.PROCESSING}:
+        raise HTTPException(status_code=409, detail="문서를 이미 변환하고 있습니다.")
+
+    intensity = normalize_intensity(payload.intensity)
+    document.meta_data = {
+        **(document.meta_data or {}),
+        "intensity": intensity,
+        "intensity_label": INTENSITY_LABELS[intensity],
+    }
+    document.status = DocStatus.QUEUED
+    db.add(document)
+    await db.commit()
+    await db.refresh(document)
+    background_tasks.add_task(run_document_processing, document.id)
     return document
 
 
@@ -236,7 +266,10 @@ async def read_converted_original_document(
     return StreamingResponse(
         io.BytesIO(content),
         media_type=media_type,
-        headers={"Content-Disposition": f"inline; filename*=UTF-8''{encoded}"},
+        headers={
+            "Content-Disposition": f"inline; filename*=UTF-8''{encoded}",
+            "Cache-Control": "no-store, max-age=0",
+        },
     )
 
 
@@ -254,7 +287,10 @@ async def download_layout_pdf(
     return StreamingResponse(
         io.BytesIO(content),
         media_type="application/pdf",
-        headers={"Content-Disposition": f"inline; filename*=UTF-8''{encoded}"},
+        headers={
+            "Content-Disposition": f"inline; filename*=UTF-8''{encoded}",
+            "Cache-Control": "no-store, max-age=0",
+        },
     )
 
 

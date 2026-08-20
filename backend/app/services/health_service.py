@@ -43,6 +43,12 @@ async def get_llm_status() -> dict[str, str]:
                 status = {"status": "bad", "label": "LLM", "message": "인증 실패"}
             elif response.status_code == 429:
                 status = {"status": "warn", "label": "LLM", "message": "사용량 제한"}
+            elif response.status_code >= 500:
+                status = {
+                    "status": "bad",
+                    "label": "LLM",
+                    "message": f"제공 서버 오류({response.status_code})",
+                }
             else:
                 status = {
                     "status": "bad",

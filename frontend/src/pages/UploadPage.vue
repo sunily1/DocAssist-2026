@@ -207,7 +207,16 @@ const changedTerms = computed<ChangeItem[]>(() => {
   const seen = new Set<string>();
   const items: ChangeItem[] = [];
   conversion.value.paragraphs.forEach((paragraph, paragraphIndex) => {
-    (paragraph.changed_terms || []).forEach((term, termIndex) => {
+    const orderedTerms = (paragraph.changed_terms || [])
+      .map((term, termIndex) => ({ term, termIndex }))
+      .sort((left, right) => {
+        const leftPosition = paragraph.original.indexOf(String(left.term.from || ""));
+        const rightPosition = paragraph.original.indexOf(String(right.term.from || ""));
+        return (leftPosition < 0 ? Number.MAX_SAFE_INTEGER : leftPosition)
+          - (rightPosition < 0 ? Number.MAX_SAFE_INTEGER : rightPosition)
+          || left.termIndex - right.termIndex;
+      });
+    orderedTerms.forEach(({ term, termIndex }) => {
       const from = String(term.from || "").trim();
       const to = String(term.to || "").trim();
       if (!isMeaningfulChange(from, to)) return;

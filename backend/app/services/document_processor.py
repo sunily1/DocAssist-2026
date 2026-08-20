@@ -218,7 +218,7 @@ class DocumentProcessor:
         file_path: str,
         paragraphs: list[dict[str, Any]],
     ) -> bytes:
-        """원본 페이지를 유지하고 실제 변경 표현의 좌표만 쉬운말로 덮어씁니다."""
+        """원본 페이지를 유지하고 변경이 있는 텍스트 블록을 쉬운말로 다시 배치합니다."""
         layout = self.extract_pdf_layout(file_path)
         font_path = self._pdf_font_path()
         if not font_path:
@@ -230,11 +230,25 @@ class DocumentProcessor:
                     break
                 page = doc[page_index]
                 font_name = f"docassist_ko_{page_index}"
+                blocks = page_layout.get("blocks", [])
 
-                for block in page_layout.get("blocks", []):
+                for block_index, block in enumerate(blocks):
                     original = str(block.get("original") or "").strip()
                     changes = self._pdf_changes_for_block(original, paragraphs)
                     if not original or not changes:
+                        continue
+
+                    converted = original
+                    for _, _, term in sorted(
+                        changes,
+                        key=lambda item: len(str(item[2].get("from") or "")),
+                        reverse=True,
+                    ):
+                        source = str(term.get("from") or "").strip()
+                        replacement = str(term.get("to") or "").strip()
+                        if source and replacement and source != replacement:
+                            converted = converted.replace(source, replacement)
+                    if converted == original:
                         continue
 
                     block_rect = fitz.Rect(block.get("bbox", []))
@@ -242,26 +256,66 @@ class DocumentProcessor:
                     if block_rect.is_empty:
                         continue
 
-                    for _, _, term in changes:
-                        source = str(term.get("from") or "").strip()
-                        replacement = str(term.get("to") or "").strip()
-                        if not source or not replacement:
-                            continue
-                        for source_rect in page.search_for(source, clip=block_rect):
-                            target = source_rect & page.rect
-                            if target.is_empty:
-                                continue
-                            self._replace_pdf_phrase_at_rect(
-                                page,
-                                target,
-                                replacement,
-                                font_name=font_name,
-                                font_path=font_path,
-                                preferred_size=float(block.get("font_size") or 10),
-                                color=self._pdf_text_color(block.get("color")),
-                            )
+                    next_y = page.rect.y1
+                    for later_block in blocks[block_index + 1:]:
+                        later_rect = fitz.Rect(later_block.get("bbox", []))
+                        if later_rect.y0 >= block_rect.y1:
+                            next_y = later_rect.y0
+                            break
+
+                    target = fitz.Rect(
+                        block_rect.x0 - 0.5,
+                        block_rect.y0 - 0.3,
+                        block_rect.x1 + 0.5,
+                        max(block_rect.y1 + 0.3, next_y - 1.0),
+                    )
+                    target.intersect(page.rect)
+                    self._replace_pdf_text_block(
+                        page,
+                        block_rect,
+                        target,
+                        converted,
+                        font_name=font_name,
+                        font_path=font_path,
+                        preferred_size=float(block.get("font_size") or 10),
+                        color=self._pdf_text_color(block.get("color")),
+                    )
 
             return doc.tobytes(garbage=4, deflate=True, clean=True)
+
+    def _replace_pdf_text_block(
+        self,
+        page: fitz.Page,
+        original_rect: fitz.Rect,
+        target: fitz.Rect,
+        text: str,
+        *,
+        font_name: str,
+        font_path: str,
+        preferred_size: float,
+        color: tuple[float, float, float],
+    ) -> bool:
+        """블록 전체를 같은 글자 크기로 다시 써 긴 쉬운말도 문장 흐름에 포함합니다."""
+        start_size = min(preferred_size, max(5.5, original_rect.height * 0.76))
+        minimum_size = max(5.5, start_size * 0.85)
+        size = start_size
+        while size >= minimum_size:
+            shape = page.new_shape()
+            remaining = shape.insert_textbox(
+                target,
+                text,
+                fontname=font_name,
+                fontfile=font_path,
+                fontsize=size,
+                color=color,
+                lineheight=1.15,
+            )
+            if remaining >= 0:
+                page.draw_rect(original_rect, color=None, fill=(1, 1, 1), overlay=True)
+                shape.commit(overlay=True)
+                return True
+            size -= 0.5
+        return False
 
     def _replace_pdf_phrase_at_rect(
         self,
@@ -278,8 +332,12 @@ class DocumentProcessor:
         target = fitz.Rect(rect.x0 - 0.5, rect.y0 - 0.3, rect.x1 + 0.5, rect.y1 + 0.3)
         target.intersect(page.rect)
         start_size = min(preferred_size, max(5.0, target.height * 0.76))
+        # 긴 쉬운말을 원래의 짧은 칸에 억지로 넣어 글자가 작아지는 것을 막습니다.
+        # 원문 크기의 88% 안에서 들어가지 않으면 원문 PDF는 유지하고, 뷰어의
+        # 페이지 기준 오버레이가 동일한 크기로 쉬운말을 표시합니다.
+        minimum_size = max(5.5, start_size * 0.88)
         size = start_size
-        while size >= 3.5:
+        while size >= minimum_size:
             shape = page.new_shape()
             remaining = shape.insert_textbox(
                 target,
@@ -495,7 +553,7 @@ class DocumentProcessor:
         intensity_guide = {
             "close": "Keep the original business tone. Replace mainly difficult words and expressions.",
             "easy": "Split long sentences, explain difficult expressions, and keep a clear professional tone.",
-            "summary": "Prioritize paragraph summaries, action items, dates, amounts, conditions, and responsible teams.",
+            "summary": "Rewrite difficult Sino-Korean, technical, and loanword expressions more actively. Keep every fact, date, name, and obligation, and split long sentences into very easy professional Korean.",
         }[normalized_intensity]
 
         system_prompt = f"""
@@ -536,7 +594,9 @@ Guidelines:
 3. Process the main paragraphs in order. If the document is long, include the most important paragraphs.
 4. Extract action items, dates, amounts, conditions, owners, and difficult term explanations when present.
 5. Do not replace ordinary words that are already easy, such as "일정". Keep replacements concise and preferably no longer than the source expression.
-6. Return only valid JSON.
+6. Rewrite complete Korean expressions, including endings and particles. Never make broken forms such as "맞추기해야", "할 수 없음한", or "의견해 주시기".
+7. Make the three levels observably different: close changes only highly formal terms, easy also changes normal business jargon, and summary additionally simplifies sentence structure.
+8. Return only valid JSON.
 """
 
         try:
@@ -634,7 +694,7 @@ Guidelines:
             len(paragraph.get("changed_terms") or [])
             for paragraph in result.get("paragraphs", [])
         )
-        return fallback_count > 0 and result_count == 0
+        return fallback_count > result_count
 
 
 processor = DocumentProcessor()

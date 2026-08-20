@@ -1,46 +1,29 @@
 import { test, expect } from '@playwright/test';
 
 test('theme toggle works only in profile page', async ({ page }) => {
-  // Mock API
-  await page.route('**/api/v1/auth/login', async route => {
-    await route.fulfill({ json: { access_token: 'fake-token' } });
+  await page.addInitScript(() => {
+    localStorage.setItem('token', 'theme-test-token');
+    localStorage.setItem('role', 'USER');
+    localStorage.setItem('theme', 'light');
   });
-  await page.route('**/api/v1/users/me', async route => {
-    await route.fulfill({ 
-      json: { 
-        id: '1', 
-        email: 'test@example.com', 
-        name: 'Test User', 
+  await page.route('**/api/v1/**', async route => {
+    const path = new URL(route.request().url()).pathname;
+    if (path.endsWith('/users/me')) {
+      return route.fulfill({ json: {
+        id: '1',
+        email: 'test@example.com',
+        name: 'Test User',
         role: 'USER',
         profile_settings: {
-            ui: { fontSize: 'md', sentenceMode: true },
-            assist: { level: 'mid', termDepth: 3, evidenceMode: 'panel' }
-        }
-      } 
-    });
-  });
-  await page.route('**/api/v1/users/me', async route => {
-      // Handle PATCH for saving settings
-      if (route.request().method() === 'PATCH') {
-          await route.fulfill({ json: { id: '1', email: 'test@example.com' } });
-      } else {
-          await route.continue();
-      }
+          ui: { theme: 'light', fontSize: 'md', customFontSize: 16, sentenceMode: true },
+          assist: { level: 'easy', termDepth: 3, evidenceMode: 'panel' },
+        },
+      } });
+    }
+    return route.fulfill({ json: {} });
   });
 
-  // 1. Go to Profile page (will redirect to login first)
-  await page.goto('http://localhost:3000/profile');
-  
-  // Login flow
-  if (page.url().includes('login')) {
-    await page.fill('input[type="email"]', 'test@example.com');
-    await page.fill('input[type="password"]', 'password');
-    await page.click('button[type="submit"]');
-    // Wait for navigation
-    await page.waitForURL('**/');
-  }
-
-  // Ensure we are on Profile page
+  // 1. Go to Profile page with an isolated authenticated state.
   await page.goto('http://localhost:3000/profile');
 
   // 2. Check sidebar does NOT have theme toggle
@@ -50,8 +33,8 @@ test('theme toggle works only in profile page', async ({ page }) => {
 
   // 3. Find Theme settings in Content area
   // There are buttons "라이트" and "다크"
-  const lightBtn = page.locator('button', { hasText: '라이트' });
-  const darkBtn = page.locator('button', { hasText: '다크' });
+  const lightBtn = page.getByRole('button', { name: '밝게', exact: true });
+  const darkBtn = page.getByRole('button', { name: '어둡게', exact: true });
 
   // Initial state check
   const html = page.locator('html');
@@ -60,10 +43,10 @@ test('theme toggle works only in profile page', async ({ page }) => {
   // 4. Switch to Dark
   await darkBtn.click();
   await expect(html).toHaveAttribute('data-theme', 'dark');
-  await expect(darkBtn).toHaveClass(/on/); // Check active class
+  await expect(darkBtn).toHaveClass(/active/); // Check active class
 
   // 5. Switch to Light
   await lightBtn.click();
   await expect(html).toHaveAttribute('data-theme', 'light');
-  await expect(lightBtn).toHaveClass(/on/); // Check active class
+  await expect(lightBtn).toHaveClass(/active/); // Check active class
 });

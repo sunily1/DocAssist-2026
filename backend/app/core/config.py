@@ -40,6 +40,7 @@ class Settings(BaseSettings):
     SECRET_KEY: str = "secret"
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
+    CORS_ORIGINS: str = "http://localhost:3000"
 
     # Initial administrator. Set only in the local/server .env file.
     INITIAL_ADMIN_EMAIL: str = os.getenv("INITIAL_ADMIN_EMAIL", "").strip()
@@ -66,5 +67,9 @@ class Settings(BaseSettings):
         case_sensitive=True,
         extra="ignore" 
     )
+
+    @property
+    def cors_origins(self) -> list[str]:
+        return [origin.strip() for origin in self.CORS_ORIGINS.split(",") if origin.strip()]
 
 settings = Settings()

@@ -1,39 +1,47 @@
-version: '3.8'
-
 services:
   db:
-    image: postgres:15
+    image: pgvector/pgvector:pg16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+      POSTGRES_DB: ${POSTGRES_DB:-docassist}
     volumes:
       - postgres_data_prod:/var/lib/postgresql/data
-      - ./backend/pgvector_setup.sql:/docker-entrypoint-initdb.d/setup.sql # Ensure pgvector if needed
-    environment:
-      - POSTGRES_USER=postgres
-      - POSTGRES_PASSWORD=password
-      - POSTGRES_DB=docassist
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-docassist}"]
       interval: 5s
       timeout: 5s
-      retries: 5
+      retries: 10
 
   backend:
     build: ./backend
-    restart: always
+    restart: unless-stopped
     environment:
-      - DATABASE_URL=postgresql+asyncpg://postgres:password@db:5432/docassist
-      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-docassist}
+      SECRET_KEY: ${SECRET_KEY:?SECRET_KEY is required}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost}
+      INITIAL_ADMIN_EMAIL: ${INITIAL_ADMIN_EMAIL:-}
+      INITIAL_ADMIN_PASSWORD: ${INITIAL_ADMIN_PASSWORD:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      OPENAI_BASE_URL: ${OPENAI_BASE_URL:-}
+      OPENAI_CHAT_MODEL: ${OPENAI_CHAT_MODEL:-gpt-4o-mini}
+      OPENAI_QA_MODEL: ${OPENAI_QA_MODEL:-gpt-4o-mini}
+      OPENAI_EMBEDDING_MODEL: ${OPENAI_EMBEDDING_MODEL:-text-embedding-3-small}
+      DICTIONARY_API_KEY: ${DICTIONARY_API_KEY:-}
+      DICTIONARY_API_URL: ${DICTIONARY_API_URL:-https://kli.korean.go.kr/term/api/search.do}
     depends_on:
       db:
         condition: service_healthy
     volumes:
-      - ./backend/uploads:/app/uploads
-      - ./backend/logs:/app/logs
+      - uploads_prod:/app/uploads
+      - logs_prod:/app/logs
     ports:
       - "8000:8000"
 
   frontend:
     build: ./frontend
-    restart: always
+    restart: unless-stopped
     ports:
       - "80:80"
     depends_on:
@@ -41,4 +49,5 @@ services:
 
 volumes:
   postgres_data_prod:
-
+  uploads_prod:
+  logs_prod:

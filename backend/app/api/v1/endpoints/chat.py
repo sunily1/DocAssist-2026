@@ -51,6 +51,19 @@ async def get_messages(
     messages = await chat_service.get_messages(db, session_id, skip=skip, limit=limit)
     return messages
 
+
+@router.delete("/sessions/{session_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_session(
+    session_id: UUID,
+    current_user: User = Depends(deps.get_current_user),
+    db: AsyncSession = Depends(deps.get_db),
+) -> None:
+    """현재 사용자가 소유한 대화와 메시지를 삭제합니다."""
+    session = await chat_service.get_session(db, session_id)
+    if not session or session.user_id != current_user.id:
+        raise HTTPException(status_code=404, detail="대화 세션을 찾을 수 없습니다.")
+    await chat_service.delete_session(db, session)
+
 @router.post("/sessions/{session_id}/ask", response_model=ChatMessageRead)
 async def ask_question(
     session_id: UUID,
