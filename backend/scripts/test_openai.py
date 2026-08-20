@@ -8,8 +8,12 @@ sys.path.append(os.getcwd())
 
 from app.core.config import settings
 
-async def test_openai():
-    print("DEBUG: API key loaded" if settings.OPENAI_API_KEY else "DEBUG: No API key loaded")
+async def check_openai():
+    if not settings.OPENAI_API_KEY:
+        print("SKIP: OPENAI_API_KEY is not configured.")
+        return
+
+    print("DEBUG: API key loaded")
     client_options = {"api_key": settings.OPENAI_API_KEY}
     if settings.OPENAI_BASE_URL:
         client_options["base_url"] = settings.OPENAI_BASE_URL
@@ -28,6 +32,5 @@ async def test_openai():
         print(f"ERROR: LLM API call failed ({type(e).__name__}, status={status}, code={code})")
 
 if __name__ == "__main__":
-    asyncio.run(test_openai())
-
+    asyncio.run(check_openai())
 

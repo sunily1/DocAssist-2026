@@ -221,7 +221,14 @@ class DocumentProcessor:
         """원본 페이지를 유지하고 변경이 있는 텍스트 블록을 쉬운말로 다시 배치합니다."""
         layout = self.extract_pdf_layout(file_path)
         font_path = self._pdf_font_path()
-        if not font_path:
+        changed_blocks: list[str] = []
+        for page_layout in layout:
+            for block in page_layout.get("blocks", []):
+                original = str(block.get("original") or "").strip()
+                if original and self._pdf_changes_for_block(original, paragraphs):
+                    changed_blocks.append(original)
+        needs_korean_font = any(re.search(r"[가-힣]", text) for text in changed_blocks)
+        if needs_korean_font and not font_path:
             raise RuntimeError("Korean PDF font is not available")
 
         with fitz.open(file_path) as doc:
@@ -229,7 +236,7 @@ class DocumentProcessor:
                 if page_index >= len(doc):
                     break
                 page = doc[page_index]
-                font_name = f"docassist_ko_{page_index}"
+                font_name = f"docassist_ko_{page_index}" if font_path else "helv"
                 blocks = page_layout.get("blocks", [])
 
                 for block_index, block in enumerate(blocks):
@@ -291,7 +298,7 @@ class DocumentProcessor:
         text: str,
         *,
         font_name: str,
-        font_path: str,
+        font_path: str | None,
         preferred_size: float,
         color: tuple[float, float, float],
     ) -> bool:
@@ -324,7 +331,7 @@ class DocumentProcessor:
         replacement: str,
         *,
         font_name: str,
-        font_path: str,
+        font_path: str | None,
         preferred_size: float,
         color: tuple[float, float, float],
     ) -> bool:
