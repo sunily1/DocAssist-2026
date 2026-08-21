@@ -91,6 +91,32 @@ def test_pdf_conversion_only_changes_blocks_containing_the_source_expression():
     assert blocks[2]["easy"] == "참석자 서명"
 
 
+def test_pdf_conversion_does_not_match_a_term_inside_another_korean_word():
+    layout = [
+        {
+            "page": 1,
+            "blocks": [
+                {"original": "인공지능부트캠프사업단", "easy": "인공지능부트캠프사업단"},
+                {"original": "교육 공지 후 시작", "easy": "교육 공지 후 시작"},
+            ],
+        }
+    ]
+    paragraphs = [
+        {
+            "original": "교육 공지 후 시작",
+            "easy": "교육 알림 후 시작",
+            "changed_terms": [{"from": "공지", "to": "알림"}],
+        }
+    ]
+
+    converted = processor.attach_converted_pdf_text(layout, paragraphs)
+    blocks = converted[0]["blocks"]
+
+    assert blocks[0]["easy"] == "인공지능부트캠프사업단"
+    assert blocks[1]["easy"] == "교육 알림 후 시작"
+    assert processor._pdf_changes_for_block(blocks[0]["original"], paragraphs) == []
+
+
 def test_layout_pdf_preserves_text_outside_the_replaced_phrase(tmp_path):
     document = fitz.open()
     page = document.new_page(width=612, height=792)

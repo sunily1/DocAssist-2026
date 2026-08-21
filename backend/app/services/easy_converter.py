@@ -170,6 +170,13 @@ AMOUNT_PATTERN = re.compile(r"(\d[\d,]*(?:\.\d+)?\s*(?:원|만원|억원|천원|
 CONDITION_PATTERN = re.compile(r"[^.?!\n]*(?:경우|조건|단,|다만|한하여|이상|이하|초과|미만|필수|제외)[^.?!\n]*")
 OWNER_PATTERN = re.compile(r"([가-힣A-Za-z0-9·/\s]{1,24}(?:팀|부서|담당자|담당|본부|센터|파트))")
 PARTICLE_PATTERN = r"(?:으로|로|이|가|을|를|은|는|과|와)"
+KOREAN_WORD_CHARACTER_PATTERN = r"0-9A-Za-z가-힣"
+# 용언 활용이나 조사가 바로 이어질 때만 원형 표현의 뒤쪽 한글을 허용합니다.
+# 예: 검토하고, 협의한, 본 건은. 반면 공지사항처럼 다른 명사의 일부인 경우는 제외합니다.
+KOREAN_GRAMMATICAL_SUFFIX_INITIALS = (
+    "은는이가을를과와의도만에로부터까지보다처럼마다조차마저"
+    "하며하고한할해했되된될돼되어겠지기면며"
+)
 
 
 def normalize_intensity(value: str | None) -> str:
@@ -195,6 +202,32 @@ def is_meaningful_change(source: str | None, replacement: str | None) -> bool:
     if len(original) <= 2 and len(easy) > len(original) * 3:
         return False
     return True
+
+
+def compile_standalone_term_pattern(
+    term: str,
+    *,
+    optional_particle: bool = False,
+) -> re.Pattern[str]:
+    """다른 단어 내부는 제외하고 조사·활용형이 붙은 표현까지 찾습니다."""
+    particle = rf"(?P<particle>{PARTICLE_PATTERN})?" if optional_particle else ""
+    return re.compile(
+        rf"(?<![{KOREAN_WORD_CHARACTER_PATTERN}])"
+        rf"{re.escape(term)}{particle}"
+        rf"(?=$|[^{KOREAN_WORD_CHARACTER_PATTERN}]|[{KOREAN_GRAMMATICAL_SUFFIX_INITIALS}])"
+    )
+
+
+def contains_standalone_term(text: str, term: str) -> bool:
+    if not text or not term:
+        return False
+    return compile_standalone_term_pattern(term).search(text) is not None
+
+
+def replace_standalone_term(text: str, term: str, replacement: str) -> str:
+    if not text or not term or term == replacement:
+        return text
+    return compile_standalone_term_pattern(term).sub(lambda _: replacement, text)
 
 
 def split_paragraphs(text: str) -> list[str]:
@@ -236,7 +269,7 @@ def _particle_for(replacement: str, particle: str) -> str:
 
 def _replace_easy_term(text: str, term: str, replacement: str) -> tuple[str, list[tuple[str, str]]]:
     changes: list[tuple[str, str]] = []
-    pattern = re.compile(rf"{re.escape(term)}(?P<particle>{PARTICLE_PATTERN})?")
+    pattern = compile_standalone_term_pattern(term, optional_particle=True)
 
     def replace_match(match: re.Match[str]) -> str:
         particle = match.group("particle") or ""

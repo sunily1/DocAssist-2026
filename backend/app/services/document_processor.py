@@ -12,9 +12,11 @@ import tiktoken
 from app.core.config import settings
 from app.services.easy_converter import (
     build_easy_conversion,
+    contains_standalone_term,
     has_valid_openai_key,
     is_meaningful_change,
     normalize_intensity,
+    replace_standalone_term,
 )
 
 
@@ -164,7 +166,7 @@ class DocumentProcessor:
                     source = str(term.get("from") or "").strip()
                     replacement = str(term.get("to") or "").strip()
                     if source and replacement and source != replacement:
-                        easy = easy.replace(source, replacement)
+                        easy = replace_standalone_term(easy, source, replacement)
                 block["easy"] = easy
         return layout
 
@@ -187,7 +189,7 @@ class DocumentProcessor:
                     and replacement
                     and source != replacement
                     and is_meaningful_change(source, replacement)
-                    and source in text
+                    and contains_standalone_term(text, source)
                     and key not in seen
                 ):
                     matches.append((paragraph_index, term_index, term))
@@ -254,7 +256,7 @@ class DocumentProcessor:
                         source = str(term.get("from") or "").strip()
                         replacement = str(term.get("to") or "").strip()
                         if source and replacement and source != replacement:
-                            converted = converted.replace(source, replacement)
+                            converted = replace_standalone_term(converted, source, replacement)
                     if converted == original:
                         continue
 

@@ -358,13 +358,15 @@ def _changed_term_pairs(document: Document) -> list[tuple[str, str]]:
 
 
 def _replace_text_node_values(root: ET.Element, pairs: list[tuple[str, str]]) -> None:
+    from app.services.easy_converter import replace_standalone_term
+
     namespace = {"w": "http://schemas.openxmlformats.org/wordprocessingml/2006/main"}
     for node in root.findall(".//w:t", namespace):
         if not node.text:
             continue
         value = node.text
         for source, target in pairs:
-            value = value.replace(source, target)
+            value = replace_standalone_term(value, source, target)
         node.text = value
 
 

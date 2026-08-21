@@ -1,12 +1,24 @@
 import json
 
 from app.services import corpus_difficulty
+from app.services.corpus_difficulty import get_term_difficulty, get_term_frequency
 from app.services.easy_converter import (
     apply_easy_terms,
     build_document_summary_points,
     build_easy_conversion,
+    contains_standalone_term,
+    replace_standalone_term,
 )
-from app.services.corpus_difficulty import get_term_difficulty, get_term_frequency
+
+
+def test_easy_term_does_not_change_part_of_another_korean_word():
+    converted, changes = apply_easy_terms("인공지능 교육 공지 후 시작합니다.", "summary")
+
+    assert converted == "인공지능 교육 알림 후 시작합니다."
+    assert [item["from"] for item in changes] == ["공지"]
+    assert contains_standalone_term("인공지능", "공지") is False
+    assert contains_standalone_term("교육 공지", "공지") is True
+    assert replace_standalone_term("인공지능 공지", "공지", "알림") == "인공지능 알림"
 
 
 def test_delay_conjugation_is_replaced_as_a_complete_expression():
